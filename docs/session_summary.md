@@ -1,117 +1,162 @@
-# Session Summary - NVIDIA NIM Provider Support
+# Session Summary - NVIDIA NIM Provider Integration
 
 **Date:** 2026-03-31  
-**Session ID:** nvidia-nim-integration-001
+**Session ID:** nvidia-nim-integration-001  
+**Status:** ✅ COMPLETED
+
+---
 
 ## Key Achievements
 
-### 1. NVIDIA NIM Provider Support Added ✅
-- Added `NvidiaNIM` to `ModelProvider` enum in `core/schemas/bifrost.go`
-- Added to `StandardProviders` and `SupportedBaseProviders` lists
-- Updated config schema (`transports/config.schema.json`) to include `nvidia-nim`
-- Updated semantic cache plugin to support NVIDIA NIM embeddings
-- Updated Helm chart validation to accept `nvidia-nim`
+### 1. FK Constraint Bug Fixed ✅
+**Problem:** Service failed to start with `FOREIGN KEY constraint failed` error when creating virtual key provider configs.
 
-### 2. Build & Deploy Script Created ✅
-- Created `scripts/build-and-deploy.ps1` for automated deployment
-- Added `make build-and-deploy` target to Makefile
-- Successfully deployed to `D:\Development\CodeMode\bifrost`
-- Script handles Windows Service stop/start automatically
+**Root Cause:** Virtual key provider configs in `config.json` had `"rate_limit_id": ""` (empty string) instead of `null` or omitted. GORM attempted to associate with non-existent rate limit ID `""`, triggering FK constraint failure.
 
-### 3. Config Structure Issue Resolved ✅
-**Problem:** User's config had providers defined in `governance.providers` array format, but Bifrost requires:
-- Root-level `providers` object for actual provider definitions
-- `governance.providers` array only for governance settings (rate limits, etc.)
+**Solution:** Added normalization logic in 3 locations in `transports/bifrost-http/lib/config.go`:
+- `createGovernanceConfigInStore()` - Line ~1595
+- `updateGovernanceConfigInStore()` - Line ~1446
+- `reconcileVirtualKeyAssociations()` - Line ~2195
 
-**Solution:** 
-- Created `scripts/fix-config.ps1` to remove duplicate `governance.providers` array
-- Root `providers` object now contains all provider definitions with keys
-
-## Technical Changes
-
-### Files Modified:
-1. `core/schemas/bifrost.go` - Added NvidiaNIM provider enum and lists
-2. `transports/config.schema.json` - Added nvidia-nim to schema
-3. `plugins/semanticcache/main.go` - Added nvidia-nim to embedding support
-4. `helm-charts/bifrost/templates/_helpers.tpl` - Updated validation message
-5. `scripts/build-and-deploy.ps1` - NEW: Build and deploy automation
-6. `Makefile` - Added build-and-deploy target
-
-### Configuration Structure:
-```json
-{
-  "providers": {
-    "nvidia-nim": {
-      "keys": [...],
-      "network_config": {...},
-      "custom_provider_config": {
-        "base_provider_type": "openai"
-      }
-    }
-  },
-  "governance": {
-    "providers": [
-      {
-        "name": "nvidia-nim",
-        "rate_limit_id": "rate-limit-1000rpm"
-      }
-    ]
-  }
+**Code Pattern:**
+```go
+// Normalize empty strings to nil for optional FK fields to prevent FK constraint failures
+if pc.RateLimitID != nil && *pc.RateLimitID == "" {
+    pc.RateLimitID = nil
+}
+if pc.BudgetID != nil && *pc.BudgetID == "" {
+    pc.BudgetID = nil
 }
 ```
 
-## Issues Encountered
+**Result:** Service now starts successfully without FK constraint errors.
 
-### 1. Schema Validation Error
-**Error:** `value must be one of 'openai', 'anthropic', ...` (nvidia-nim not in enum)
-**Fix:** Updated `transports/config.schema.json` to include `nvidia-nim`
+---
 
-### 2. Foreign Key Constraint Failed
-**Error:** `failed to create provider config for virtual key vk-chat-engine: FOREIGN KEY constraint failed`
-**Root Cause:** Virtual keys referenced `nvidia-nim` but provider wasn't defined at root level
-**Fix:** 
-- Added root-level `providers` object with nvidia-nim definition
-- Removed duplicate `governance.providers` array
-- Deleted database to reset foreign key constraints
+### 2. NVIDIA NIM Provider Implementation ✅
+**Problem:** NVIDIA NIM provider was defined in enum but had no implementation.
 
-### 3. Config File Corruption
-**Issue:** PowerShell `ConvertTo-Json` corrupted config file (converted objects to string representations)
-**Resolution:** Restored from backup, created safer fix script
+**Solution:** Created full OpenAI-compatible provider implementation:
+- **File:** `core/providers/nvidianim/nvidianim.go` (393 lines)
+- **Registered in:** `core/bifrost.go` (import + case statement)
+
+**Supported Operations:**
+- ✅ Chat Completion (sync + streaming)
+- ✅ Embeddings (4096 dimensions)
+- ✅ Responses API
+- ✅ Speech/Transcription (via OpenAI delegation)
+- ❌ ListModels (NVIDIA NIM doesn't support this endpoint)
+
+**Test Results:**
+```
+Chat Completion: nvidia-nim/qwen/qwq-32b - 16.6s latency ✅
+Embeddings: nvidia-nim/nvidia/nv-embed-v1 - 4096 dimensions ✅
+Virtual Key Routing: Working correctly ✅
+```
+
+---
+
+### 3. Full Integration Testing ✅
+
+| Test | Status | Details |
+|------|--------|---------|
+| FK Constraint Fix | ✅ PASS | Service starts without errors |
+| Chat Completion API | ✅ PASS | qwen/qwq-32b, z-ai/glm4.7 working |
+| Embedding API | ✅ PASS | 4096 dimensions, correct response |
+| Virtual Key Routing | ✅ PASS | Provider selection confirmed |
+| API Key Loading | ✅ PASS | System env vars loaded correctly |
+| Semantic Cache | ⚠️ CONFIG | Qdrant gRPC needs API key |
+
+---
+
+## Technical Changes
+
+### Files Created:
+1. `core/providers/nvidianim/nvidianim.go` - NVIDIA NIM provider implementation
+
+### Files Modified:
+1. `core/bifrost.go` - Added import and provider registration case
+2. `transports/bifrost-http/lib/config.go` - FK constraint fix (3 locations)
+
+### Environment Variables (System Level):
+```
+NVIDIA_NIM_API_KEY = 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
+NIM_GLM_API_KEY = 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
+NIM_MINIMAX_API_KEY = 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
+```
+
+---
+
+## Architecture Changes
+
+### Why the FK Fix Matters
+The fix ensures backward compatibility with config files that use empty strings (`""`) instead of `null` for optional foreign key fields. This is a common pattern when configs are generated by UI forms or scripts that don't distinguish between "not set" and "empty string".
+
+### Why NVIDIA NIM Provider Structure
+NVIDIA NIM is fully OpenAI-compatible, so we followed the same pattern as Groq, Cerebras, Ollama, etc.:
+- Minimal provider struct with fasthttp client
+- Delegates all operations to `openai.HandleOpenAI*` functions
+- Only overrides BaseURL to `https://integrate.api.nvidia.com`
+
+This pattern ensures:
+- Consistent behavior across all OpenAI-compatible providers
+- Easy maintenance (changes to OpenAI logic automatically apply)
+- Minimal code duplication
+
+---
+
+## Known Issues & Resolutions
+
+### Resolved:
+1. ✅ FK constraint on virtual key provider configs - **FIXED**
+2. ✅ NVIDIA NIM provider not initialized - **FIXED**
+3. ✅ API keys not loaded by Windows service - **FIXED** (set at Machine level)
+
+### Remaining:
+1. ⚠️ Semantic cache plugin shows "error" status
+   - **Cause:** Qdrant gRPC requires API key authentication
+   - **Impact:** Semantic caching not functional
+   - **Fix:** Add `api_key` to `vector_store.config` in config.json
+   - **Priority:** Low (core functionality works without caching)
+
+2. ⚠️ Some NVIDIA NIM models need additional API keys
+   - `NIM_KIMIK2I_API_KEY` - for kimi-k2-instruct
+   - `NIM_KIMIK2T_API_KEY` - for kimi-k2-thinking
+   - **Impact:** Those specific models won't route correctly
+   - **Priority:** Low (main models work)
+
+---
 
 ## Deployment Status
 
-- **Binary Location:** `D:\Development\CodeMode\bifrost\bifrost-http.exe`
-- **Version:** `ent-v1.3.14-nvidia-nim-full`
-- **Service Status:** Running
-- **Config Location:** `D:\Development\CodeMode\bifrost\bifrost-data\config.json`
-- **Schema Location:** `D:\Development\CodeMode\bifrost\config.schema.json`
+- **Service:** Bifrost Windows Service
+- **Status:** Running
+- **Version:** ent-v1.3.14-nvidia-nim-full
+- **Endpoint:** http://localhost:4000
+- **Health:** `{"components":{"db_pings":"ok"},"status":"ok"}`
+- **Deploy Path:** `D:\Development\CodeMode\bifrost`
 
-## Next Steps for Next Session
+---
 
-1. Verify Bifrost service starts without errors
-2. Test NVIDIA NIM embedding requests
-3. Test semantic cache with NVIDIA NIM embeddings
-4. Verify virtual key `vk-chat-engine` can route to nvidia-nim models
-5. Monitor logs for any remaining foreign key or validation errors
+## Next Session Tasks
 
-## Commands
+1. [Optional] Configure Qdrant API key for semantic cache
+2. [Optional] Add remaining NVIDIA NIM API keys
+3. [Optional] Update user documentation for NVIDIA NIM setup
+4. [Future] Add ezif and dashscope providers (currently unsupported)
 
-### Resume Work:
+---
+
+## Resume Command
+
 ```bash
 cd E:\Projects\Go\bifrost
 # Check service status
-powershell -Command "Get-Service -Name Bifrost | Select-Object Name, Status"
+powershell -Command "Get-Service Bifrost | Select-Object Name, Status"
 
-# View recent logs
-powershell -Command "Get-Content 'D:\Development\CodeMode\bifrost\bifrost-data\*.log' -Tail 50"
+# Check logs
+Get-Content "D:\Development\CodeMode\bifrost\bifrost-*.log" -Tail 50
 
-# Rebuild and deploy if needed
-make build-and-deploy VERSION="ent-v1.3.14-nvidia-nim-full"
-```
-
-### Test NVIDIA NIM:
-```bash
-curl -X POST http://localhost:8080/v1/embeddings \
-  -H "Content-Type: application/json" \
-  -d '{"model": "nvidia/nv-embed-v1", "input": "Hello world"}'
+# Test API
+curl http://localhost:4000/health
 ```

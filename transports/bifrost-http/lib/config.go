@@ -1591,6 +1591,13 @@ func updateGovernanceConfigInStore(
 			}
 			for j := range providerConfigs {
 				providerConfigs[j].VirtualKeyID = virtualKey.ID
+				// Normalize empty strings to nil for optional FK fields to prevent FK constraint failures
+				if providerConfigs[j].RateLimitID != nil && *providerConfigs[j].RateLimitID == "" {
+					providerConfigs[j].RateLimitID = nil
+				}
+				if providerConfigs[j].BudgetID != nil && *providerConfigs[j].BudgetID == "" {
+					providerConfigs[j].BudgetID = nil
+				}
 				if err := config.ConfigStore.CreateVirtualKeyProviderConfig(ctx, &providerConfigs[j], tx); err != nil {
 					return fmt.Errorf("failed to create provider config for virtual key %s: %w", virtualKey.ID, err)
 				}
@@ -1766,6 +1773,14 @@ func createGovernanceConfigInStore(ctx context.Context, config *Config) {
 
 			for _, pc := range providerConfigs {
 				pc.VirtualKeyID = virtualKey.ID
+				// Normalize empty strings to nil for optional FK fields to prevent FK constraint failures
+				// This handles config.json files that use "" instead of null/omitted for optional fields
+				if pc.RateLimitID != nil && *pc.RateLimitID == "" {
+					pc.RateLimitID = nil
+				}
+				if pc.BudgetID != nil && *pc.BudgetID == "" {
+					pc.BudgetID = nil
+				}
 				logger.Debug("creating provider config for VK %s: provider=%s, keys=%d", virtualKey.ID, pc.Provider, len(pc.Keys))
 				if err := config.ConfigStore.CreateVirtualKeyProviderConfig(ctx, &pc, tx); err != nil {
 					logger.Error("failed to create provider config for virtual key %s: %v", virtualKey.ID, err)
@@ -2496,6 +2511,13 @@ func reconcileVirtualKeyAssociations(
 	for _, newPC := range newProviderConfigs {
 		newProviderSet[newPC.Provider] = true
 		newPC.VirtualKeyID = vkID
+		// Normalize empty strings to nil for optional FK fields to prevent FK constraint failures
+		if newPC.RateLimitID != nil && *newPC.RateLimitID == "" {
+			newPC.RateLimitID = nil
+		}
+		if newPC.BudgetID != nil && *newPC.BudgetID == "" {
+			newPC.BudgetID = nil
+		}
 		if existing, found := existingByProvider[newPC.Provider]; found {
 			// Update existing provider config from file
 			existing.Weight = newPC.Weight
