@@ -1,0 +1,260 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "client": {
+    "timeout_seconds": 900,
+    "cache": {
+      "enabled": true,
+      "type": "local",
+      "semantic_caching": true
+    }
+  },
+  "governance": {
+    "enforce_virtual_keys": true,
+    "drop_unknown_parameters": true,
+    "virtual_keys": [
+      {
+        "id": "vk-chat-engine",
+        "name": "ChatEngine",
+        "description": "Routes requests for chat-engine group",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["moonshotai/kimi-k2-instruct"]
+          }
+        ]
+      }
+    ],
+    "providers": [
+      {
+        "name": "dashscope",
+        "keys": [
+          {
+            "name": "dashscope-main",
+            "value": "env.DASHSCOPE_API_KEY",
+            "models": ["qwen3.5-plus"],
+            "weight": 1.0
+          }
+        ]
+      },
+      {
+        "name": "nvidia-nim",
+        "store_raw_request_response": true,
+        "rate_limit_id": "rate-limit-1000rpm",
+        "network_config": {
+          "base_url": "https://integrate.api.nvidia.com",
+          "default_request_timeout_in_seconds": 120,
+          "max_retries": 3,
+          "retry_backoff_initial": 1000,
+          "retry_backoff_max": 10000
+        },
+        "custom_provider_config": {
+          "base_provider_type": "openai",
+          "is_key_less": false,
+          "allowed_requests": {
+            "chat_completion": true,
+            "embedding": true
+          }
+        },
+        "keys": [
+          {
+            "name": "nim-main",
+            "value": "env.NVIDIA_NIM_API_KEY",
+            "models": [
+              "z-ai/glm4.7",
+              "qwen/qwen3-coder-480b-a35b-instruct",
+              "qwen/qwen3.5-122b-a10b",
+              "nvidia/nv-embed-v1",
+              "nvidia/nv-embedcode-7b-v1",
+              "google/gemma-3-27b-it",
+              "deepseek-ai/deepseek-v3.2",
+              "deepseek-ai/deepseek-v3.1-terminus",
+              "qwen/qwen2.5-coder-7b-instruct",
+              "qwen/qwq-32b"
+            ],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-glm5-key",
+            "value": "env.NIM_GLM_API_KEY",
+            "models": ["z-ai/glm5"],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-minimax-key",
+            "value": "env.NIM_MINIMAX_API_KEY",
+            "models": ["minimaxai/minimax-m2.5"],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-kimi-k2i-key",
+            "value": "env.NIM_KIMIK2I_API_KEY",
+            "models": ["moonshotai/kimi-k2-instruct"],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-kimi-k2t-key",
+            "value": "env.NIM_KIMIK2T_API_KEY",
+            "models": ["moonshotai/kimi-k2-thinking"],
+            "weight": 1.0
+          }
+        ]
+      },
+      {
+        "name": "ezif",
+        "base_url": "env.EZIF_API_BASE",
+        "keys": [
+          {
+            "name": "ezif-main",
+            "value": "env.EZIF_API_KEY",
+            "weight": 1.0,
+            "models": [
+              "ezif/claude-sonnet-4.6",
+              "ezif/gemini-3-pro-preview",
+              "ezif/qwen3.5-plus",
+              "ezif/minimax-m2.5",
+              "ezif/glm-5",
+              "ezif/qwen3.5-397b-a17b",
+              "ezif/qwen3-235b-a22b",
+              "ezif/gemini-3-flash-preview",
+              "ezif/qwen3.5-flash",
+              "ezif/kimi-k2.5",
+              "ezif/qwen-video",
+              "ezif/qwen-deep-research",
+              "ezif/qwen-image",
+              "ezif/gemini-3-pro-image-preview",
+              "ezif/grok-image"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "enabled": true,
+      "name": "semantic_cache",
+      "config": {
+        "provider": "nvidia-nim",
+        "keys": [{ "name": "embed-key", "value": "env.NVIDIA_NIM_API_KEY" }],
+        "embedding_model": "nvidia/nv-embed-v1",
+        "dimension": 1024,
+        "cleanup_on_shutdown": true,
+        "ttl": "5m",
+        "threshold": 0.8,
+        "conversation_history_threshold": 3,
+        "cache_by_model": true,
+        "cache_by_provider": true
+      }
+    }
+  ],
+  "vector_store": {
+    "enabled": true,
+    "type": "qdrant",
+    "config": {
+      "host": "localhost",
+      "port": 6334
+    }
+  },
+  "providers": {
+    "dashscope": {
+      "keys": [
+        {
+          "name": "dashscope-main",
+          "value": "env.DASHSCOPE_API_KEY",
+          "models": ["qwen3.5-plus"],
+          "weight": 1.0
+        }
+      ]
+    },
+    "nvidia-nim": {
+      "network_config": {
+        "base_url": "https://integrate.api.nvidia.com",
+        "default_request_timeout_in_seconds": 120,
+        "max_retries": 3,
+        "retry_backoff_initial": 1000,
+        "retry_backoff_max": 10000
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "is_key_less": false,
+        "allowed_requests": {
+          "chat_completion": true,
+          "chat_completion_stream": true,
+          "embedding": true,
+          "embedding_stream": false
+        }
+      },
+      "keys": [
+        {
+          "name": "nim-main",
+          "value": "env.NVIDIA_NIM_API_KEY",
+          "models": [
+            "z-ai/glm4.7",
+            "qwen/qwen3-coder-480b-a35b-instruct",
+            "qwen/qwen3.5-122b-a10b",
+            "nvidia/nv-embed-v1",
+            "nvidia/nv-embedcode-7b-v1",
+            "google/gemma-3-27b-it",
+            "deepseek-ai/deepseek-v3.2",
+            "deepseek-ai/deepseek-v3.1-terminus",
+            "qwen/qwen2.5-coder-7b-instruct",
+            "qwen/qwq-32b"
+          ],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-glm5-key",
+          "value": "env.NIM_GLM_API_KEY",
+          "models": ["z-ai/glm5"],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-minimax-key",
+          "value": "env.NIM_MINIMAX_API_KEY",
+          "models": ["minimaxai/minimax-m2.5"],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-kimi-k2i-key",
+          "value": "env.NIM_KIMIK2I_API_KEY",
+          "models": ["moonshotai/kimi-k2-instruct"],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-kimi-k2t-key",
+          "value": "env.NIM_KIMIK2T_API_KEY",
+          "models": ["moonshotai/kimi-k2-thinking"],
+          "weight": 1.0
+        }
+      ]
+    },
+    "ezif": {
+      "base_url": "env.EZIF_API_BASE",
+      "keys": [
+        {
+          "name": "ezif-main",
+          "value": "env.EZIF_API_KEY",
+          "weight": 1.0,
+          "models": [
+            "ezif/claude-sonnet-4.6",
+            "ezif/gemini-3-pro-preview",
+            "ezif/qwen3.5-plus",
+            "ezif/minimax-m2.5",
+            "ezif/glm-5",
+            "ezif/qwen3.5-397b-a17b",
+            "ezif/qwen3-235b-a22b",
+            "ezif/gemini-3-flash-preview",
+            "ezif/qwen3.5-flash",
+            "ezif/kimi-k2.5",
+            "ezif/qwen-video",
+            "ezif/qwen-deep-research",
+            "ezif/qwen-image",
+            "ezif/gemini-3-pro-image-preview",
+            "ezif/grok-image"
+          ]
+        }
+      ]
+    }
+  }
+}

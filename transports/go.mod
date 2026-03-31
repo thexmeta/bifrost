@@ -133,6 +133,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.32 // indirect
 	github.com/maximhq/bifrost/plugins/mocker v1.5.4 // indirect
 	github.com/maximhq/maxim-go v0.2.1 // indirect
+	github.com/maximhq/bifrost/core/providers/nvidia v0.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
@@ -208,3 +209,23 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
 )
+
+replace github.com/maximhq/bifrost/framework => ../framework
+
+replace github.com/maximhq/bifrost/core => ../core
+
+replace github.com/maximhq/bifrost/plugins/governance => ../plugins/governance
+
+replace github.com/maximhq/bifrost/plugins/logging => ../plugins/logging
+
+replace github.com/maximhq/bifrost/plugins/maxim => ../plugins/maxim
+
+replace github.com/maximhq/bifrost/plugins/otel => ../plugins/otel
+
+replace github.com/maximhq/bifrost/plugins/semanticcache => ../plugins/semanticcache
+
+replace github.com/maximhq/bifrost/plugins/telemetry => ../plugins/telemetry
+
+replace github.com/maximhq/bifrost/plugins/litellmcompat => ../plugins/litellmcompat
+
+replace github.com/maximhq/bifrost/plugins/mocker => ../plugins/mocker

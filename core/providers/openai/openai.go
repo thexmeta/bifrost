@@ -772,6 +772,26 @@ func HandleOpenAIChatCompletionRequest(
 	customErrorConverter ErrorConverter,
 	logger schemas.Logger,
 ) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+	// Validate that a key is present for non-keyless custom providers
+	if key.Value.GetValue() == "" {
+		// Check if this is a custom provider
+		isCustomProvider, _ := ctx.Value(schemas.BifrostContextKeyIsCustomProvider).(bool)
+		if isCustomProvider {
+			return nil, &schemas.BifrostError{
+				IsBifrostError: true,
+				Error: &schemas.ErrorField{
+					Message: "API key is required for this custom provider but no key value was found. Please verify the provider configuration includes a valid API key.",
+					Error:   fmt.Errorf("missing API key for custom provider %s", providerName),
+				},
+				ExtraFields: schemas.BifrostErrorExtraFields{
+					Provider:       providerName,
+					ModelRequested: request.Model,
+					RequestType:    schemas.ChatCompletionRequest,
+				},
+			}
+		}
+	}
+
 	// Create request
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
