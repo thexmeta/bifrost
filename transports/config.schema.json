@@ -302,6 +302,9 @@
         },
         "runway": {
           "$ref": "#/$defs/provider"
+        },
+        "nvidia-nim": {
+          "$ref": "#/$defs/provider"
         }
       },
       "additionalProperties": true
@@ -1296,7 +1299,8 @@
                         "perplexity",
                         "replicate",
                         "sgl",
-                        "huggingface"
+                        "huggingface",
+                        "nvidia-nim"
                       ]
                     },
                     "keys": {

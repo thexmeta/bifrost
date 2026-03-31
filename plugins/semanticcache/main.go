@@ -238,6 +238,7 @@ var ProvidersWithEmbeddingSupport = map[schemas.ModelProvider]bool{
 	schemas.Nebius:      true,
 	schemas.HuggingFace: true,
 	schemas.SGL:         true,
+	schemas.NvidiaNIM:   true,
 }
 
 const (
@@ -328,7 +329,7 @@ func Init(ctx context.Context, config *Config, logger schemas.Logger, store vect
 	} else {
 		// Validate that the provider supports embeddings
 		if bifrost.IsStandardProvider(config.Provider) && !ProvidersWithEmbeddingSupport[config.Provider] {
-			return nil, fmt.Errorf("provider '%s' does not support embedding operations required for semantic cache. Supported providers: openai, azure, bedrock, cohere, gemini, vertex, mistral, ollama, nebius, huggingface, sgl. Note: custom providers based on embedding-capable providers are also supported", config.Provider)
+			return nil, fmt.Errorf("provider '%s' does not support embedding operations required for semantic cache. Supported providers: openai, azure, bedrock, cohere, gemini, vertex, mistral, ollama, nebius, huggingface, sgl, nvidia-nim. Note: custom providers based on embedding-capable providers are also supported", config.Provider)
 		}
 
 		bifrost, err := bifrost.Init(ctx, schemas.BifrostConfig{
