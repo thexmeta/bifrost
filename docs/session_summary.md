@@ -1,7 +1,15 @@
 # Session Summary - Enterprise Features Enablement
 
-**Session ID:** enterprise-features-enablement-001  
-**Date:** 2026-04-01  
+**Session ID:** enterprise-features-enablement-001
+**Date:** 2026-04-01
+**Status:** ✅ COMPLETE
+
+---
+
+# Session Summary - Build & Deploy Script Fixes
+
+**Session ID:** build-deploy-fixes-002
+**Date:** 2026-04-02
 **Status:** ✅ COMPLETE
 
 ---
@@ -189,3 +197,97 @@ All external telemetry and diagnostic calls disabled:
 cd E:\Projects\Go\bifrost
 # Continue with enterprise feature configuration or testing
 ```
+
+---
+
+## Key Achievements (Session 002 - Build & Deploy Fixes)
+
+### Issues Fixed:
+
+| Issue | Root Cause | Fix | File |
+|-------|-----------|-----|------|
+| **Build script path error** | Relative path `transports\bifrost-http` from scripts/ directory | Changed to `..\transports\bifrost-http` | `scripts/build-and-deploy.ps1` |
+| **Stale go.mod dependency** | `github.com/maximhq/bifrost/core/providers/nvidia v0.0.0` (doesn't exist, actual name is `nvidianim`) | Removed stale indirect dependency | `transports/go.mod` |
+| **Service crash on startup** | Duplicate virtual key names in config.json (`vk-tool-engine` and `vk-embeddding-engine` both had name "EmbedEngine") | Renamed `vk-tool-engine` name to "ToolEngine" | Deployed `config.json` |
+
+### Build & Deploy:
+- ✅ Build script fixed and tested
+- ✅ `go mod tidy` run in transports module
+- ✅ Binary built successfully: `bifrost-http.exe` (88.71 MB)
+- ✅ Deployed to `D:\Development\CodeMode\bifrost`
+- ✅ Service running on port 4000
+
+---
+
+## Lines of Code (Session 002)
+
+| Category | Changed | File |
+|----------|---------|------|
+| **Build Script** | 1 line | `scripts/build-and-deploy.ps1` |
+| **Go Module** | 1 line removed | `transports/go.mod` |
+| **Deployed Config** | 1 line (name change) | `D:\Development\CodeMode\bifrost\bifrost-data\config.json` |
+| **Total** | 3 lines changed | 3 files |
+
+---
+
+## Why: Root Cause Analysis
+
+### 1. Build Script Path Error
+**Root Cause:** Script was written assuming execution from project root, but runs from `scripts/` subdirectory.
+**Fix:** Changed `$BuildDir = "transports\bifrost-http"` to `$BuildDir = "..\transports\bifrost-http"`
+
+### 2. Stale go.mod Entry
+**Root Cause:** An indirect dependency on `providers/nvidia` was added (likely from autocomplete or import), but the actual provider is `providers/nvidianim`. This caused `go mod tidy` to fail looking for a non-existent module.
+**Fix:** Removed the stale entry from `transports/go.mod`
+
+### 3. Virtual Key Name Collision
+**Root Cause:** The deployed config.json had two virtual keys with the same name "EmbedEngine":
+- `vk-tool-engine` → name: "EmbedEngine"
+- `vk-embeddding-engine` → name: "EmbedEngine"
+
+The governance plugin syncs virtual keys from config to SQLite on startup. When it tried to create the second key with a duplicate name, the database unique constraint failed and the service crashed.
+**Fix:** Renamed `vk-tool-engine` name from "EmbedEngine" to "ToolEngine"
+
+---
+
+## Files Modified (Session 002)
+
+### Modified:
+1. `scripts/build-and-deploy.ps1` - Fixed build directory path
+2. `transports/go.mod` - Removed stale nvidia dependency
+3. `transports/go.sum` - Updated via `go mod tidy`
+4. `D:\Development\CodeMode\bifrost\bifrost-data\config.json` - Fixed virtual key name (deployed config)
+
+---
+
+## Testing (Session 002)
+
+### Verification Steps:
+1. ✅ Build script runs without path errors
+2. ✅ `go mod tidy` completes successfully
+3. ✅ Binary builds without errors
+4. ✅ Service starts without crashing
+5. ✅ Port 4000 is listening
+6. ✅ No fatal errors in logs
+
+---
+
+## Known Issues / Notes
+
+1. **Deployed Config Divergence:** The deployed config at `D:\Development\CodeMode\bifrost\bifrost-data\config.json` now differs from the source `E:\Projects\Go\bifrost\config.json`. This is expected for production deployments but should be noted.
+
+2. **Virtual Key Names:** Virtual key names must be unique in the governance system. When adding new virtual keys, ensure the `name` field is unique even if `id` is different.
+
+---
+
+## Next Session Tasks
+
+### Recommended:
+1. Sync deployed config changes back to source control if needed
+2. Document virtual key configuration in project docs
+3. Consider adding validation for duplicate virtual key names in config schema
+
+### Optional:
+1. Configure actual API keys for deployed providers
+2. Test MCP tool execution with configured providers
+3. Set up monitoring/alerting for the deployed service

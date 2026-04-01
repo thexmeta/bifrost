@@ -1,24 +1,24 @@
 # Active Context - Bifrost Enterprise Features
 
-**Last Updated:** 2026-04-01
-**Session:** enterprise-features-enablement-001 (COMPLETED)
+**Last Updated:** 2026-04-02
+**Session:** build-deploy-fixes-002 (COMPLETED)
+**Previous:** enterprise-features-enablement-001 (COMPLETED)
 **Next Session:** enterprise-configuration-002 (Optional - Feature Configuration)
 
 ---
 
 ## Current Focus
 
-**COMPLETED:**
-- ✅ All enterprise license features enabled in configuration
-- ✅ All enterprise UI pages created and accessible (no license gates)
-- ✅ All external telemetry disabled (offline mode)
-- ✅ UI rebuilt with enterprise mode forced
-- ✅ Go binary rebuilt with embedded UI
-- ✅ Service deployed and running on port 4000
-- ✅ Health check passing
+**COMPLETED (Session 002 - Build & Deploy Fixes):**
+- ✅ Fixed build script path error (`scripts/build-and-deploy.ps1`)
+- ✅ Removed stale go.mod dependency (`transports/go.mod`)
+- ✅ Fixed duplicate virtual key name collision (deployed config.json)
+- ✅ Rebuilt and redeployed bifrost-http binary
+- ✅ Service running on port 4000
 
 **CURRENT STATE:**
-- Service is running and healthy
+- Service is running and healthy on port 4000
+- Build script works correctly from scripts/ directory
 - All enterprise features accessible from UI dashboard
 - No external telemetry or diagnostic calls
 - Configuration complete, ready for feature-specific setup
@@ -35,28 +35,76 @@
 ### Service Status
 - **Name:** Bifrost
 - **Status:** Running
-- **Version:** ent-v1.3.16-base-8-g218233f6-dirty
+- **Version:** plugins/maxim/v1.5.35-14-gaebe93d7-dirty
 - **Endpoint:** http://localhost:4000
-- **Health:** ✅ `{"components":{"db_pings":"ok"},"status":"ok"}`
+- **Health:** ✅ OK (no fatal errors in logs)
 
 ### Configuration Files
-- **Config:** `E:\Projects\Go\bifrost\config.json`
+- **Source Config:** `E:\Projects\Go\bifrost\config.json`
   - ✅ `enterprise` section with all features enabled
   - ✅ `is_enterprise: true` in governance plugin
-  - ✅ All enterprise feature configurations present
+- **Deployed Config:** `D:\Development\CodeMode\bifrost\bifrost-data\config.json`
+  - ⚠️ **Diverges from source** - has custom virtual keys and provider configs
+  - ✅ Virtual key names are unique (fixed: `vk-tool-engine` → "ToolEngine")
 - **Schema:** `E:\Projects\Go\bifrost\transports\config.schema.json`
   - ✅ `enterprise_config` definition added (~400 lines)
 
-### UI Build
-- **Mode:** Enterprise (forced in `next.config.ts`)
-- **Status:** Built and embedded in binary
-- **Pages Added:** 16 new enterprise feature pages
+### Build State
+- **UI Mode:** Enterprise (forced in `next.config.ts`)
+- **Binary:** Embedded UI included
+- **Last Build:** 2026-04-02
+- **Build Script:** `scripts/build-and-deploy.ps1` (fixed path issue)
+
+### Go Modules
+- **Workspace:** Go 1.26.1 (`go.work`)
+- **Modules:** core, framework, transports, plugins/*
+- **Last Tidy:** 2026-04-02 (removed stale nvidia dependency)
 
 ---
 
 ## Scratchpad
 
-### Environment Variables (Optional - for feature activation)
+### Lessons Learned (2026-04-02)
+
+#### 1. Build Script Path Resolution
+Scripts running from subdirectories must use relative paths correctly:
+```powershell
+# WRONG (from scripts/ directory)
+$BuildDir = "transports\bifrost-http"
+
+# CORRECT
+$BuildDir = "..\transports\bifrost-http"
+```
+
+#### 2. Go Module Indirect Dependencies
+Watch for stale indirect dependencies in `go.mod`. If you see:
+```
+github.com/maximhq/bifrost/core/providers/nvidia v0.0.0 // indirect
+```
+But the actual provider is `nvidianim`, remove it and run `go mod tidy`.
+
+#### 3. Virtual Key Name Uniqueness
+Virtual keys must have unique `name` fields (not just unique `id`):
+```json
+// ❌ CONFLICT - same name, different IDs
+{"id": "vk-tool-engine", "name": "EmbedEngine"}
+{"id": "vk-embeddding-engine", "name": "EmbedEngine"}
+
+// ✅ FIXED - unique names
+{"id": "vk-tool-engine", "name": "ToolEngine"}
+{"id": "vk-embeddding-engine", "name": "EmbedEngine"}
+```
+
+### Deployed Config Virtual Keys
+```
+vk-chat-engine|ChatEngine
+vk-coding-engine|CodingEngine
+vk-small-engine|SmallEngine
+vk-tool-engine|ToolEngine         ← Fixed from "EmbedEngine"
+vk-embeddding-engine|EmbedEngine
+vk-code-embeddding-engine|CodeEmbedEngine
+vk-gemini-researcher|Gemini Grounded Research
+```
 ```bash
 # SSO
 SSO_ISSUER=https://your-org.okta.com/oauth2/default
@@ -94,7 +142,7 @@ Invoke-WebRequest http://localhost:4000/workspace/datadog
 
 ## Open Tasks
 
-### Completed ✅
+### Completed ✅ (Session 001 - Enterprise Features)
 - [x] Enable all enterprise features in config.json
 - [x] Add enterprise_config to config.schema.json
 - [x] Create UI pages for all enterprise features
@@ -105,6 +153,13 @@ Invoke-WebRequest http://localhost:4000/workspace/datadog
 - [x] Deploy and verify service health
 - [x] Document all changes
 
+### Completed ✅ (Session 002 - Build & Deploy Fixes)
+- [x] Fix build script path error (`scripts/build-and-deploy.ps1`)
+- [x] Remove stale go.mod dependency (`transports/go.mod`)
+- [x] Fix duplicate virtual key name collision
+- [x] Rebuild and redeploy bifrost-http binary
+- [x] Verify service running on port 4000
+
 ### Next Session (Optional)
 - [ ] Configure SSO with Okta/Entra ID
 - [ ] Set up Vault integration
@@ -113,6 +168,8 @@ Invoke-WebRequest http://localhost:4000/workspace/datadog
 - [ ] Test guardrails with actual providers
 - [ ] Configure clustering for HA
 - [ ] Add user documentation/screenshots
+- [ ] Sync deployed config changes back to source control
+- [ ] Add validation for duplicate virtual key names in config schema
 
 ---
 
@@ -178,11 +235,19 @@ curl http://localhost:4000/health
 1. All enterprise features are ENABLED and ACCESSIBLE
 2. No license gate messages appear anymore
 3. External telemetry is DISABLED (offline mode)
-4. Service is RUNNING and HEALTHY
-5. Next steps are OPTIONAL feature configuration (SSO, Vault, Datadog, etc.)
+4. Service is RUNNING and HEALTHY on port 4000
+5. Build script fixed and tested - use `scripts/build-and-deploy.ps1`
+6. Virtual key names must be unique (fixed: `vk-tool-engine` → "ToolEngine")
 
 **Key Files to Reference:**
-- `docs/session_summary.md` - Full session summary
+- `docs/session_summary.md` - Full session summary (both sessions 001 & 002)
+- `docs/active_context.md` - This file (current state)
 - `docs/ENTERPRISE_FEATURES_CONFIGURED.md` - Enterprise features documentation
-- `config.json` - Current configuration
-- `ui/next.config.ts` - Enterprise mode flag
+- `scripts/build-and-deploy.ps1` - Working build/deploy script
+- `config.json` - Source configuration
+- `D:\Development\CodeMode\bifrost\bifrost-data\config.json` - Deployed config (diverges)
+
+**Critical Notes:**
+- Deployed config has custom virtual keys - sync back to source if needed
+- Virtual key `name` field must be unique (database constraint)
+- Build script must use `..\transports\bifrost-http` (relative from scripts/)

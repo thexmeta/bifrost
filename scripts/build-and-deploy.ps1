@@ -85,7 +85,7 @@ if (-not $NoStop) {
 # Step 2: Build the binary
 Write-Host "Step 2: Building bifrost-http..." -ForegroundColor Green
 
-$BuildDir = "transports\bifrost-http"
+$BuildDir = "..\transports\bifrost-http"
 $OutputPath = "tmp\bifrost-http.exe"
 
 # Check if Go is installed
