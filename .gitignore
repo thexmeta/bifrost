@@ -171,3 +171,6 @@ ui/app/routeTree.gen.ts
 
 .tanstack
 .next
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key

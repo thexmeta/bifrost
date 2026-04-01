@@ -140,6 +140,7 @@ go.work
 ```
 
 **Rules:**
+
 - Run `go mod tidy` in the **specific module directory**, not the root
 - Cross-module imports resolve via workspace locally, but need explicit `require` in `go.mod` for releases
 - The workspace requires **Go 1.26.1** (`go.work` directive)
@@ -227,6 +228,7 @@ ctx.WithValue(key, value)    // Chainable variant
 ```
 
 **Reserved context keys** (set by Bifrost internals — DO NOT set manually):
+
 - `BifrostContextKeySelectedKeyID/Name` — Set by governance plugin
 - `BifrostContextKeyGovernance*` — Set by governance plugin
 - `BifrostContextKeyNumberOfRetries`, `BifrostContextKeyFallbackIndex` — Set by retry/fallback logic
@@ -234,6 +236,7 @@ ctx.WithValue(key, value)    // Chainable variant
 - `BifrostContextKeyTrace*`, `BifrostContextKeySpan*` — Set by tracing middleware
 
 **User-settable keys** (plugins and handlers can set these):
+
 - `BifrostContextKeyVirtualKey` (`x-bf-vk`) — Virtual key for governance
 - `BifrostContextKeyAPIKeyName` (`x-bf-api-key`) — Explicit key selection by name
 - `BifrostContextKeyAPIKeyID` (`x-bf-api-key-id`) — Explicit key selection by ID (takes priority over name)
@@ -254,6 +257,7 @@ ctx.WithValue(key, value)    // Chainable variant
 There are **two categories** of providers:
 
 **Category 1: Non-OpenAI-compatible** (Anthropic, Bedrock, Gemini, Cohere, HuggingFace, Replicate, ElevenLabs):
+
 ```
 core/providers/<name>/
 ├── <name>.go              # Controller: constructor, interface methods, HTTP orchestration
@@ -269,6 +273,7 @@ core/providers/<name>/
 ```
 
 **Category 2: OpenAI-compatible** (Groq, Cerebras, Ollama, Perplexity, OpenRouter, Parasail, Nebius, xAI, SGL):
+
 ```
 core/providers/<name>/
 ├── <name>.go              # Minimal — constructor + delegates to openai.HandleOpenAI* functions
@@ -276,11 +281,13 @@ core/providers/<name>/
 ```
 
 **Converter function naming convention:**
+
 - `To<ProviderName><Feature>Request()` — Bifrost schema → Provider API format
 - `ToBifrost<Feature>Response()` — Provider API format → Bifrost schema
 - These must be **pure transformation functions** — no HTTP calls, no logging, no side effects
 
 **Provider constructor pattern:**
+
 ```go
 func NewProvider(config schemas.ProviderConfig) (*Provider, error) {
     // Validate config, set up fasthttp.Client with connection pooling
@@ -316,6 +323,7 @@ func NewProvider(config schemas.ProviderConfig) (*Provider, error) {
 - `Container*` and `ContainerFile*` (Create, List, Retrieve, Delete, Content)
 
 **Streaming methods** receive a `PostHookRunner` callback and return `chan *BifrostStreamChunk`:
+
 ```go
 ChatCompletionStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key, request *BifrostChatRequest) (chan *BifrostStreamChunk, *BifrostError)
 ```
@@ -323,11 +331,13 @@ ChatCompletionStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key
 ### Error Handling
 
 Each provider has `errors.go` with an `ErrorConverter` function:
+
 ```go
 type ErrorConverter func(resp *fasthttp.Response, requestType schemas.RequestType, providerName schemas.ModelProvider, model string) *schemas.BifrostError
 ```
 
 The shared utility `providerUtils.HandleProviderAPIError()` handles common HTTP error parsing. Provider-specific parsers add extra field mapping. Errors always carry metadata:
+
 ```go
 bifrostErr.ExtraFields.Provider = providerName
 bifrostErr.ExtraFields.ModelRequested = model
@@ -338,14 +348,15 @@ bifrostErr.ExtraFields.RequestType = requestType
 
 Four plugin interfaces exist:
 
-| Interface | Hook Methods | When Called |
-|-----------|-------------|------------|
-| `LLMPlugin` | `PreLLMHook`, `PostLLMHook` | Every LLM request (SDK + HTTP) |
-| `MCPPlugin` | `PreMCPHook`, `PostMCPHook` | Every MCP tool execution |
-| `HTTPTransportPlugin` | `HTTPTransportPreHook`, `HTTPTransportPostHook`, `HTTPTransportStreamChunkHook` | HTTP gateway only (not Go SDK) |
-| `ObservabilityPlugin` | `Inject(ctx, trace)` | Async, after response written to wire |
+| Interface             | Hook Methods                                                                    | When Called                           |
+| --------------------- | ------------------------------------------------------------------------------- | ------------------------------------- |
+| `LLMPlugin`           | `PreLLMHook`, `PostLLMHook`                                                     | Every LLM request (SDK + HTTP)        |
+| `MCPPlugin`           | `PreMCPHook`, `PostMCPHook`                                                     | Every MCP tool execution              |
+| `HTTPTransportPlugin` | `HTTPTransportPreHook`, `HTTPTransportPostHook`, `HTTPTransportStreamChunkHook` | HTTP gateway only (not Go SDK)        |
+| `ObservabilityPlugin` | `Inject(ctx, trace)`                                                            | Async, after response written to wire |
 
 **Key plugin behaviors:**
+
 - Plugin errors are **logged as warnings**, never returned to the caller
 - Pre-hooks can **short-circuit** by returning `*LLMPluginShortCircuit` (cache hit, auth failure, rate limit)
 - Post-hooks receive both response and error — either can be nil. Plugins can **recover from errors** (set error to nil, provide response) or **invalidate responses** (set response to nil, provide error)
@@ -367,6 +378,7 @@ p.Put(obj)
 ```
 
 **Acquire/Release pattern** for types with complex reset logic (used in `schemas/plugin.go`):
+
 ```go
 req := schemas.AcquireHTTPRequest()    // Get from pool, pre-allocated maps
 defer schemas.ReleaseHTTPRequest(req)  // Clears all maps and fields, returns to pool
@@ -375,6 +387,7 @@ defer schemas.ReleaseHTTPRequest(req)  // Clears all maps and fields, returns to
 ### HTTP Transport Layer
 
 **Handler pattern:** Handlers are structs with injected dependencies:
+
 ```go
 type CompletionHandler struct {
     client       *bifrost.Bifrost
@@ -410,6 +423,7 @@ pool.Put(msg)
 ### 2. Channel Lifecycle — ProviderQueue Pattern
 
 `ProviderQueue` uses atomic flags and `sync.Once` to prevent "send on closed channel" panics:
+
 ```go
 type ProviderQueue struct {
     queue      chan *ChannelMessage
@@ -419,6 +433,7 @@ type ProviderQueue struct {
     closeOnce  sync.Once      // ensure close fires only once
 }
 ```
+
 Always check the atomic closing flag before sending. Never close a channel without this pattern.
 
 ### 3. NetworkConfig Duration Serialization
@@ -432,6 +447,7 @@ Always check the atomic closing flag before sending. Never close a channel witho
 ### 5. Provider Interface Has 30+ Methods
 
 Adding a new operation type requires changes across the entire codebase:
+
 1. Add method to `Provider` interface in `core/schemas/provider.go`
 2. Implement in **all** 20+ providers (most return "not supported")
 3. Add `RequestType` constant in `core/schemas/bifrost.go`
@@ -466,6 +482,7 @@ When `BlockRestrictedWrites()` is active, writes to reserved keys (governance ID
 ### 12. `fasthttp`, Not `net/http`
 
 Bifrost uses `github.com/valyala/fasthttp` for provider HTTP calls. The API is different from `net/http`:
+
 - Use `fasthttp.AcquireRequest()`/`fasthttp.ReleaseRequest()` for lifecycle
 - `fasthttp.Client` pools connections per-host (`NetworkConfig.MaxConnsPerHost`, default 5000, 30s idle)
 - Request/response bodies accessed via `resp.Body()` (returns `[]byte`, not `io.Reader`)
@@ -583,22 +600,27 @@ Run: `make run-e2e FLOW=<feature>`
 Four skills are available via `/skill-name`:
 
 ### `/docs-writer <feature-name>`
+
 Write, update, or review Mintlify MDX documentation. Researches UI code, Go handlers, and config schema. Validates `config.json` examples against `transports/config.schema.json`. Outputs docs with Web UI / API / config.json tabs.
 
 Variants: `/docs-writer update <doc-path>`, `/docs-writer review <doc-path>`
 
 ### `/e2e-test <feature-name>`
+
 Create, run, debug, audit, or auto-update Playwright E2E tests.
 
 Variants:
+
 - `/e2e-test fix <spec>` — Debug and fix a failing test
 - `/e2e-test sync` — Detect UI changes, update affected tests automatically
 - `/e2e-test audit` — Scan specs for incorrect/weak assertions (P0-P6 severity scale)
 
 ### `/investigate-issue <issue-id>`
+
 Investigate a GitHub issue from `maximhq/bifrost`. Fetches issue details, classifies by type/area, searches codebase, traces dependencies, analyzes side effects, suggests tests (LLM/MCP/E2E), and presents an implementation plan with per-change approval gates.
 
 ### `/resolve-pr-comments <pr-number>`
+
 Systematically address unresolved PR review comments. Uses GraphQL to get unresolved threads, presents each with FIX/REPLY/SKIP options, collects fixes locally, and only posts replies **after code is pushed** to remote.
 
 ---
@@ -606,12 +628,14 @@ Systematically address unresolved PR review comments. Uses GraphQL to get unreso
 ## Common Workflows
 
 ### Modify chat completions across all providers
+
 1. Change types in `core/schemas/chatcompletions.go`
 2. Update converter functions in each provider's `chat.go`
 3. If streaming affected, update `framework/streaming/` (accumulator, delta copy)
 4. Run `make test-core` (all providers)
 
 ### Add a new field to API responses
+
 1. Add to schema type in `core/schemas/`
 2. Map in provider response converter (`ToBifrost*Response`)
 3. Handle in streaming accumulator if applicable
@@ -619,6 +643,7 @@ Systematically address unresolved PR review comments. Uses GraphQL to get unreso
 5. Update `transports/config.schema.json` if configurable
 
 ### Add a new plugin
+
 1. Create `plugins/<name>/` with its own `go.mod`
 2. Implement `LLMPlugin`, `MCPPlugin`, or `HTTPTransportPlugin` interface
 3. Add to `go.work`
@@ -626,6 +651,7 @@ Systematically address unresolved PR review comments. Uses GraphQL to get unreso
 5. Add test targets to `Makefile`
 
 ### Modify a UI feature
+
 1. Find workspace page: `ui/app/workspace/<feature>/`
 2. Check existing `data-testid` attributes — E2E tests depend on them
 3. Add `data-testid` to new interactive elements
@@ -636,28 +662,28 @@ Systematically address unresolved PR review comments. Uses GraphQL to get unreso
 
 ## Key Files Quick Reference
 
-| What | Where |
-|------|-------|
-| Main Bifrost struct & queuing | `core/bifrost.go` |
-| Inference routing & fallbacks | `core/inference.go` |
-| Provider interface (30+ methods) | `core/schemas/provider.go` |
-| ModelProvider enum & context keys | `core/schemas/bifrost.go` |
-| Plugin interfaces & pooled HTTP types | `core/schemas/plugin.go` |
-| BifrostContext (mutable context) | `core/schemas/context.go` |
-| Chat completion types | `core/schemas/chatcompletions.go` |
-| Responses API types | `core/schemas/responses.go` |
-| Object pool (prod + debug) | `core/pool/pool_prod.go`, `pool_debug.go` |
-| Shared provider utils & SSE parsing | `core/providers/utils/utils.go` |
-| Streaming accumulator | `framework/streaming/accumulator.go` |
-| HTTP inference handler | `transports/bifrost-http/handlers/inference.go` |
-| Governance handler | `transports/bifrost-http/handlers/governance.go` |
-| Config schema (source of truth) | `transports/config.schema.json` |
-| Pool debug profiler | `transports/bifrost-http/handlers/devpprof.go` |
-| LLM test infrastructure | `core/internal/llmtests/` |
-| MCP test infrastructure | `core/internal/mcptests/` |
-| E2E test infrastructure | `tests/e2e/core/` |
-| Docs navigation config | `docs/docs.json` |
-| CI/CD workflows | `.github/workflows/` |
+| What                                  | Where                                            |
+| ------------------------------------- | ------------------------------------------------ |
+| Main Bifrost struct & queuing         | `core/bifrost.go`                                |
+| Inference routing & fallbacks         | `core/inference.go`                              |
+| Provider interface (30+ methods)      | `core/schemas/provider.go`                       |
+| ModelProvider enum & context keys     | `core/schemas/bifrost.go`                        |
+| Plugin interfaces & pooled HTTP types | `core/schemas/plugin.go`                         |
+| BifrostContext (mutable context)      | `core/schemas/context.go`                        |
+| Chat completion types                 | `core/schemas/chatcompletions.go`                |
+| Responses API types                   | `core/schemas/responses.go`                      |
+| Object pool (prod + debug)            | `core/pool/pool_prod.go`, `pool_debug.go`        |
+| Shared provider utils & SSE parsing   | `core/providers/utils/utils.go`                  |
+| Streaming accumulator                 | `framework/streaming/accumulator.go`             |
+| HTTP inference handler                | `transports/bifrost-http/handlers/inference.go`  |
+| Governance handler                    | `transports/bifrost-http/handlers/governance.go` |
+| Config schema (source of truth)       | `transports/config.schema.json`                  |
+| Pool debug profiler                   | `transports/bifrost-http/handlers/devpprof.go`   |
+| LLM test infrastructure               | `core/internal/llmtests/`                        |
+| MCP test infrastructure               | `core/internal/mcptests/`                        |
+| E2E test infrastructure               | `tests/e2e/core/`                                |
+| Docs navigation config                | `docs/docs.json`                                 |
+| CI/CD workflows                       | `.github/workflows/`                             |
 
 ---
 
@@ -898,7 +924,7 @@ After writing code:
 
 ```bash
 cd ui && npm run format
-````
+```
 
 Then verify build:
 
@@ -906,25 +932,25 @@ Then verify build:
 cd ui && npm run build
 ```
 
-* Code must pass formatting and build checks
-* Follow consistent naming and structure conventions
+- Code must pass formatting and build checks
+- Follow consistent naming and structure conventions
 
 ---
 
 ## Anti-Patterns to Avoid
 
-* Duplicate components without considering reuse
-* Mixing multiple state management approaches unnecessarily
-* Overusing Redux
-* Using unstable hook dependencies
-* Adding heavy libraries for simple use cases
-* Poorly structured or deeply nested JSX
+- Duplicate components without considering reuse
+- Mixing multiple state management approaches unnecessarily
+- Overusing Redux
+- Using unstable hook dependencies
+- Adding heavy libraries for simple use cases
+- Poorly structured or deeply nested JSX
 
 ---
 
 ## Summary
 
-* Prioritize **reusability, performance, and consistency**
-* Follow **strict folder structure and routing conventions**
-* Use **the right tool for the right problem**
-* Keep code **simple, predictable, and maintainable**
+- Prioritize **reusability, performance, and consistency**
+- Follow **strict folder structure and routing conventions**
+- Use **the right tool for the right problem**
+- Keep code **simple, predictable, and maintainable**
