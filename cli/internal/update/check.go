@@ -48,28 +48,8 @@ func CheckInBackground(currentVersion, statePath string) <-chan *CheckResult {
 }
 
 func doCheck(currentVersion, statePath string) *CheckResult {
-	if currentVersion == "dev" || strings.TrimSpace(currentVersion) == "" {
-		return nil
-	}
-	if envSet("BIFROST_NO_UPDATE_CHECK") {
-		return nil
-	}
-
-	// Try cached version from state
-	state, err := config.LoadState(statePath)
-	if err == nil && state.LastKnownVersion != "" {
-		if time.Since(time.Unix(state.LastVersionCheck, 0)) < checkInterval {
-			return compareVersions(currentVersion, state.LastKnownVersion)
-		}
-	}
-
-	// Fetch latest version
-	latest, err := fetchLatestVersion()
-	if err != nil {
-		return nil
-	}
-
-	return compareVersions(currentVersion, latest)
+	// Disabled: No external telemetry or update checks
+	return nil
 }
 
 func fetchLatestVersion() (string, error) {

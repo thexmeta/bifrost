@@ -456,6 +456,18 @@ export interface BifrostConfig {
 	is_cache_connected: boolean;
 	is_logs_connected: boolean;
 	auth_token?: string;
+	enterprise?: {
+		sso?: any;
+		log_exports?: any;
+		rbac?: any;
+		audit_logs?: any;
+		guardrails?: any;
+		vault?: any;
+		clustering?: any;
+		adaptive_load_balancing?: any;
+		datadog?: any;
+		[key: string]: any;
+	};
 }
 
 export interface CompatConfig {

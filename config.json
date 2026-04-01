@@ -1,0 +1,211 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "encryption_key": "env.BIFROST_ENCRYPTION_KEY",
+  "auth_config": {
+    "session_timeout_hours": 24,
+    "enable_session_management": true
+  },
+  "client": {
+    "timeout_seconds": 900,
+    "cache": {
+      "enabled": true,
+      "type": "local",
+      "semantic_caching": true
+    },
+    "enable_logging": true,
+    "log_retention_days": 90
+  },
+  "governance": {
+    "enforce_virtual_keys": true,
+    "drop_unknown_parameters": true
+  },
+  "plugins": [
+    {
+      "enabled": true,
+      "name": "governance",
+      "config": {
+        "is_vk_mandatory": false,
+        "required_headers": [],
+        "is_enterprise": true
+      }
+    },
+    {
+      "enabled": true,
+      "name": "telemetry",
+      "config": {
+        "custom_labels": ["provider", "model", "virtual_key"],
+        "push_gateway": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "name": "logging",
+      "config": {
+        "disable_content_logging": false,
+        "logging_headers": ["x-bf-vk", "x-bf-user-id", "x-bf-team-id"]
+      }
+    },
+    {
+      "enabled": true,
+      "name": "otel",
+      "config": {
+        "service_name": "bifrost",
+        "collector_url": "",
+        "headers": {},
+        "trace_type": "otel",
+        "protocol": "http",
+        "tls_ca_cert": "",
+        "insecure": true,
+        "metrics_enabled": false,
+        "metrics_endpoint": "",
+        "metrics_push_interval": 15
+      }
+    },
+    {
+      "enabled": true,
+      "name": "semantic_cache",
+      "config": {
+        "enabled": true,
+        "similarity_threshold": 0.95,
+        "ttl_seconds": 86400,
+        "vector_store": {
+          "type": "qdrant",
+          "config": {
+            "host": "localhost",
+            "port": 6334,
+            "https": false,
+            "api_key": "env.QDRANT_API_KEY",
+            "collection_name": "bifrost_semantic_cache"
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "name": "maxim",
+      "config": {
+        "api_key": "env.MAXIM_API_KEY",
+        "log_repo_id": ""
+      }
+    }
+  ],
+  "enterprise": {
+    "rbac": {
+      "enabled": true,
+      "default_role": "viewer"
+    },
+    "sso": {
+      "enabled": true,
+      "provider": "okta",
+      "issuer": "env.SSO_ISSUER",
+      "client_id": "env.SSO_CLIENT_ID",
+      "client_secret": "env.SSO_CLIENT_SECRET",
+      "redirect_uri": "http://localhost:8080/auth/callback",
+      "scopes": ["openid", "email", "profile"],
+      "user_id_claim": "sub",
+      "email_claim": "email",
+      "name_claim": "name",
+      "groups_claim": "groups",
+      "role_mappings": {
+        "admin_group": "Admin",
+        "developer_group": "Developer",
+        "viewer_group": "Viewer"
+      }
+    },
+    "audit_logs": {
+      "enabled": true,
+      "retention_days": 365,
+      "include_request_body": false,
+      "include_response_body": false,
+      "events": [
+        "user.login",
+        "user.logout",
+        "user.create",
+        "user.update",
+        "user.delete",
+        "role.create",
+        "role.update",
+        "role.delete",
+        "virtual_key.create",
+        "virtual_key.update",
+        "virtual_key.delete",
+        "provider.create",
+        "provider.update",
+        "provider.delete",
+        "config.update",
+        "plugin.create",
+        "plugin.update",
+        "plugin.delete"
+      ]
+    },
+    "guardrails": {
+      "enabled": true,
+      "providers": {
+        "aws_bedrock": {
+          "enabled": true,
+          "region": "us-east-1"
+        },
+        "azure_content_safety": {
+          "enabled": true,
+          "endpoint": "env.AZURE_CONTENT_SAFETY_ENDPOINT"
+        },
+        "patronus": {
+          "enabled": true,
+          "api_key": "env.PATRONUS_API_KEY"
+        }
+      },
+      "rules": []
+    },
+    "vault": {
+      "enabled": true,
+      "type": "hashicorp",
+      "config": {
+        "address": "env.VAULT_ADDR",
+        "token": "env.VAULT_TOKEN",
+        "sync_paths": ["bifrost/*"],
+        "sync_interval_seconds": 300
+      }
+    },
+    "clustering": {
+      "enabled": true,
+      "node_name": "bifrost-node-1",
+      "advertise_addr": "env.CLUSTER_ADVERTISE_ADDR",
+      "bind_addr": "0.0.0.0",
+      "bind_port": 8301,
+      "retry_join": []
+    },
+    "adaptive_load_balancing": {
+      "enabled": true,
+      "health_check_interval_seconds": 10,
+      "warmup_requests": 10,
+      "ewma_alpha": 0.3
+    },
+    "log_exports": {
+      "enabled": true,
+      "destination": {
+        "type": "s3",
+        "config": {
+          "bucket": "env.LOG_EXPORT_BUCKET",
+          "region": "us-east-1",
+          "prefix": "bifrost-logs/",
+          "format": "json",
+          "compression": "gzip"
+        }
+      },
+      "schedule": {
+        "interval_hours": 1
+      }
+    },
+    "datadog": {
+      "enabled": true,
+      "api_key": "env.DATADOG_API_KEY",
+      "app_key": "env.DATADOG_APP_KEY",
+      "site": "datadoghq.com",
+      "traces_enabled": true,
+      "metrics_enabled": true,
+      "logs_enabled": true
+    }
+  }
+}

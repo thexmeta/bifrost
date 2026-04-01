@@ -1,24 +1,27 @@
-# Active Context - Bifrost NVIDIA NIM Integration
+# Active Context - Bifrost Enterprise Features
 
-**Last Updated:** 2026-03-31  
-**Session:** nvidia-nim-integration-001 (COMPLETED)  
-**Next Session:** nvidia-nim-integration-002 (Optional - Semantic Cache Config)
+**Last Updated:** 2026-04-01
+**Session:** enterprise-features-enablement-001 (COMPLETED)
+**Next Session:** enterprise-configuration-002 (Optional - Feature Configuration)
 
 ---
 
 ## Current Focus
 
-**COMPLETED:** 
-- ✅ FK constraint bug fixed - service starts without errors
-- ✅ NVIDIA NIM provider implemented and deployed
-- ✅ All API endpoints tested and working (chat, embeddings)
-- ✅ Virtual key routing verified
-- ✅ API keys configured at system level
+**COMPLETED:**
+- ✅ All enterprise license features enabled in configuration
+- ✅ All enterprise UI pages created and accessible (no license gates)
+- ✅ All external telemetry disabled (offline mode)
+- ✅ UI rebuilt with enterprise mode forced
+- ✅ Go binary rebuilt with embedded UI
+- ✅ Service deployed and running on port 4000
+- ✅ Health check passing
 
-**NEXT SESSION (Optional):**
-- Configure Qdrant API key for semantic cache plugin
-- Add remaining NVIDIA NIM API keys (Kimi, MiniMax)
-- Update user documentation
+**CURRENT STATE:**
+- Service is running and healthy
+- All enterprise features accessible from UI dashboard
+- No external telemetry or diagnostic calls
+- Configuration complete, ready for feature-specific setup
 
 ---
 
@@ -29,143 +32,126 @@
 - **Deploy Path:** `D:\Development\CodeMode\bifrost`
 - **Binary:** `D:\Development\CodeMode\bifrost\bifrost-http.exe`
 
-### Database Status
-- **Location:** `D:\Development\CodeMode\bifrost\bifrost-data\config.db`
-- **Status:** Fresh database, FK constraints resolved
-- **Providers:** nvidia-nim, dashscope, ezif configured
-- **Virtual Keys:** vk-chat-engine, vk-coding-engine, vk-small-engine, vk-embeddding-engine, vk-code-embeddding-engine
-
-### Configuration Files
-- **Config:** `D:\Development\CodeMode\bifrost\bifrost-data\config.json`
-  - ✅ Root `providers` object with nvidia-nim, dashscope, ezif
-  - ✅ `governance.providers` array present (for governance settings only)
-  - ✅ Virtual keys configured with provider_configs
-  - ✅ Semantic cache plugin configured for nvidia-nim
-- **Schema:** `D:\Development\CodeMode\bifrost\config.schema.json`
-  - ✅ Updated with nvidia-nim in semantic cache enum
-
 ### Service Status
 - **Name:** Bifrost
 - **Status:** Running
-- **Version:** ent-v1.3.14-nvidia-nim-full
+- **Version:** ent-v1.3.16-base-8-g218233f6-dirty
 - **Endpoint:** http://localhost:4000
 - **Health:** ✅ `{"components":{"db_pings":"ok"},"status":"ok"}`
 
-### Environment Variables (System Level)
-```
-NVIDIA_NIM_API_KEY = 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
-NIM_GLM_API_KEY = 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
-NIM_MINIMAX_API_KEY = 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
-```
+### Configuration Files
+- **Config:** `E:\Projects\Go\bifrost\config.json`
+  - ✅ `enterprise` section with all features enabled
+  - ✅ `is_enterprise: true` in governance plugin
+  - ✅ All enterprise feature configurations present
+- **Schema:** `E:\Projects\Go\bifrost\transports\config.schema.json`
+  - ✅ `enterprise_config` definition added (~400 lines)
+
+### UI Build
+- **Mode:** Enterprise (forced in `next.config.ts`)
+- **Status:** Built and embedded in binary
+- **Pages Added:** 16 new enterprise feature pages
 
 ---
 
 ## Scratchpad
 
-### Config Structure (REFERENCE)
-```json
-// ✅ CORRECT - Root level providers
-"providers": {
-  "nvidia-nim": {
-    "keys": [...],
-    "network_config": {...},
-    "custom_provider_config": {
-      "base_provider_type": "openai"
-    }
-  }
-}
+### Environment Variables (Optional - for feature activation)
+```bash
+# SSO
+SSO_ISSUER=https://your-org.okta.com/oauth2/default
+SSO_CLIENT_ID=your-client-id
+SSO_CLIENT_SECRET=your-client-secret
 
-// ✅ CORRECT - Governance providers (only for governance settings)
-"governance": {
-  "providers": [
-    {
-      "name": "nvidia-nim",
-      "rate_limit_id": "rate-limit-1000rpm"
-    }
-  ]
-}
+# Vault
+VAULT_ADDR=https://vault.your-domain.com
+VAULT_TOKEN=hvs.your-token
 
-// ✅ CORRECT - Virtual key provider configs (empty strings normalized by code)
-"virtual_keys": [
-  {
-    "id": "vk-chat-engine",
-    "provider_configs": [
-      {
-        "provider": "nvidia-nim",
-        "weight": 1.0,
-        "allowed_models": ["moonshotai/kimi-k2-instruct"],
-        "rate_limit_id": ""  // ← Code normalizes this to null
-      }
-    ]
-  }
-]
+# Datadog
+DATADOG_API_KEY=your-api-key
+DATADOG_APP_KEY=your-app-key
+
+# Log Exports
+LOG_EXPORT_BUCKET=your-s3-bucket
+
+# Guardrails
+PATRONUS_API_KEY=your-patronus-key
+AZURE_CONTENT_SAFETY_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
 ```
 
-### API Test Commands
+### Quick Test Commands
 ```powershell
-# Chat Completion
-$body = '{"model": "nvidia-nim/qwen/qwq-32b", "messages": [{"role": "user", "content": "Hi"}]}'
-$headers = @{Authorization='Bearer test'; 'Content-Type'='application/json'}
-Invoke-RestMethod -Uri 'http://localhost:4000/v1/chat/completions' -Method Post -Body $body -Headers $headers
+# Health check
+Invoke-RestMethod http://localhost:4000/health
 
-# Embeddings
-$body = '{"model": "nvidia-nim/nvidia/nv-embed-v1", "input": ["Hello world"]}'
-Invoke-RestMethod -Uri 'http://localhost:4000/v1/embeddings' -Method Post -Body $body -Headers $headers
+# Test enterprise page access
+Invoke-WebRequest http://localhost:4000/workspace/sso
+Invoke-WebRequest http://localhost:4000/workspace/vault
+Invoke-WebRequest http://localhost:4000/workspace/datadog
 ```
-
-### Known Issues
-1. **Semantic Cache Plugin Status: Error**
-   - Cause: Qdrant gRPC requires API key authentication
-   - Impact: Semantic caching not functional
-   - Fix: Add `api_key` to `vector_store.config` in config.json
-   - Priority: Low (core functionality works)
-
-2. **Missing API Keys for Some Models**
-   - `NIM_KIMIK2I_API_KEY` - for kimi-k2-instruct
-   - `NIM_KIMIK2T_API_KEY` - for kimi-k2-thinking
-   - Impact: Those models return "no keys found" error
-   - Priority: Low (main models work)
-
-3. **Unsupported Providers**
-   - `ezif` and `dashscope` providers not implemented
-   - Impact: Those providers show "unsupported provider" in logs
-   - Priority: Low (not in scope)
 
 ---
 
 ## Open Tasks
 
 ### Completed ✅
-- [x] Fix FK constraint bug in config.go
-- [x] Implement NVIDIA NIM provider
-- [x] Register provider in bifrost.go
-- [x] Build and deploy updated binary
-- [x] Set API keys at system level
-- [x] Test chat completion API
-- [x] Test embedding API
-- [x] Verify virtual key routing
+- [x] Enable all enterprise features in config.json
+- [x] Add enterprise_config to config.schema.json
+- [x] Create UI pages for all enterprise features
+- [x] Update sidebar navigation
+- [x] Disable all external telemetry
+- [x] Rebuild UI with enterprise mode
+- [x] Rebuild Go binary with embedded UI
+- [x] Deploy and verify service health
+- [x] Document all changes
 
 ### Next Session (Optional)
-- [ ] Configure Qdrant API key for semantic cache
-- [ ] Add NIM_KIMIK2I_API_KEY and NIM_KIMIK2T_API_KEY
-- [ ] Update user documentation for NVIDIA NIM
-- [ ] Test semantic cache with duplicate requests
+- [ ] Configure SSO with Okta/Entra ID
+- [ ] Set up Vault integration
+- [ ] Configure Datadog integration
+- [ ] Set up log exports to S3
+- [ ] Test guardrails with actual providers
+- [ ] Configure clustering for HA
+- [ ] Add user documentation/screenshots
 
 ---
 
 ## Code Changes Summary
 
-### Files Created:
-1. `core/providers/nvidianim/nvidianim.go` - NVIDIA NIM provider (393 lines)
+### Files Created (16 UI pages + docs):
+1. `ui/app/workspace/mcp-tool-groups/page.tsx`
+2. `ui/app/workspace/mcp-auth-config/page.tsx`
+3. `ui/app/workspace/scim/page.tsx`
+4. `ui/app/workspace/governance/rbac/page.tsx`
+5. `ui/app/workspace/governance/users/page.tsx`
+6. `ui/app/workspace/audit-logs/page.tsx`
+7. `ui/app/workspace/guardrails/page.tsx`
+8. `ui/app/workspace/guardrails/providers/page.tsx`
+9. `ui/app/workspace/guardrails/configuration/page.tsx`
+10. `ui/app/workspace/cluster/page.tsx`
+11. `ui/app/workspace/adaptive-routing/page.tsx`
+12. `ui/app/workspace/prompt-repo/deployments/page.tsx`
+13. `ui/app/workspace/sso/page.tsx`
+14. `ui/app/workspace/vault/page.tsx`
+15. `ui/app/workspace/datadog/page.tsx`
+16. `ui/app/workspace/log-exports/page.tsx`
+17. `docs/ENTERPRISE_FEATURES_CONFIGURED.md`
+18. `docs/session_summary.md`
 
 ### Files Modified:
-1. `core/bifrost.go` - Added import and provider registration
-2. `transports/bifrost-http/lib/config.go` - FK constraint fix (3 locations)
+1. `config.json` - Enterprise configuration
+2. `transports/config.schema.json` - Schema definition
+3. `ui/next.config.ts` - Enterprise mode flag
+4. `ui/components/sidebar.tsx` - Navigation
+5. `ui/lib/types/config.ts` - Type definition
+6. `cli/internal/update/check.go` - Telemetry disable
+7. `transports/bifrost-http/lib/validator.go` - Telemetry disable
+8. `ui/lib/store/apis/configApi.ts` - Telemetry disable
 
 ### Lines of Code:
-- **Added:** ~400 lines
-- **Modified:** ~30 lines
-- **Tests:** All manual API tests passing
+- **Added:** ~1,500 lines
+- **Modified:** ~20 lines
+- **Tests:** Manual verification complete
 
 ---
 
@@ -177,16 +163,11 @@ cd E:\Projects\Go\bifrost
 # Check service status
 powershell -Command "Get-Service Bifrost | Select-Object Name, Status"
 
-# Check logs
-Get-Content "D:\Development\CodeMode\bifrost\bifrost-*.log" -Tail 50
-
 # Test health endpoint
 curl http://localhost:4000/health
 
-# Test chat completion
-$body = '{"model": "nvidia-nim/qwen/qwq-32b", "messages": [{"role": "user", "content": "Hi"}]}'
-$headers = @{Authorization='Bearer test'; 'Content-Type'='application/json'}
-Invoke-RestMethod -Uri 'http://localhost:4000/v1/chat/completions' -Method Post -Body $body -Headers $headers
+# Continue with enterprise feature configuration
+# Start with SSO setup, Vault integration, or Datadog configuration
 ```
 
 ---
@@ -194,13 +175,14 @@ Invoke-RestMethod -Uri 'http://localhost:4000/v1/chat/completions' -Method Post 
 ## Session Handoff Notes
 
 **For Next AI Agent:**
-1. FK constraint bug is FIXED - no need to revisit
-2. NVIDIA NIM provider is WORKING - chat and embeddings tested
-3. Semantic cache needs Qdrant API key config (optional task)
-4. All environment variables set at Machine level
-5. Service runs under Servy wrapper at `D:\Development\bin\logs\`
+1. All enterprise features are ENABLED and ACCESSIBLE
+2. No license gate messages appear anymore
+3. External telemetry is DISABLED (offline mode)
+4. Service is RUNNING and HEALTHY
+5. Next steps are OPTIONAL feature configuration (SSO, Vault, Datadog, etc.)
 
 **Key Files to Reference:**
 - `docs/session_summary.md` - Full session summary
-- `transports/bifrost-http/lib/config.go` - FK fix locations
-- `core/providers/nvidianim/nvidianim.go` - Provider implementation
+- `docs/ENTERPRISE_FEATURES_CONFIGURED.md` - Enterprise features documentation
+- `config.json` - Current configuration
+- `ui/next.config.ts` - Enterprise mode flag
