@@ -1,7 +1,0 @@
-{
-  "database": "dolt",
-  "backend": "dolt",
-  "dolt_mode": "server",
-  "dolt_database": "bifrost",
-  "project_id": "acac6a4b-1438-433e-aea8-f6de803c8819"
-}
