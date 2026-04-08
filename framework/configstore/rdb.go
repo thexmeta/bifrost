@@ -1622,6 +1622,36 @@ func (s *RDBConfigStore) UpdateConfig(ctx context.Context, config *tables.TableG
 	return txDB.WithContext(ctx).Save(config).Error
 }
 
+const enterpriseConfigKey = "enterprise_config"
+
+// GetEnterpriseConfig retrieves the enterprise configuration from the database.
+func (s *RDBConfigStore) GetEnterpriseConfig(ctx context.Context) (map[string]any, error) {
+	config, err := s.GetConfig(ctx, enterpriseConfigKey)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return map[string]any{}, nil
+		}
+		return nil, err
+	}
+	var result map[string]any
+	if err := json.Unmarshal([]byte(config.Value), &result); err != nil {
+		return map[string]any{}, nil
+	}
+	return result, nil
+}
+
+// UpdateEnterpriseConfig saves the enterprise configuration to the database.
+func (s *RDBConfigStore) UpdateEnterpriseConfig(ctx context.Context, config map[string]any) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal enterprise config: %w", err)
+	}
+	return s.UpdateConfig(ctx, &tables.TableGovernanceConfig{
+		Key:   enterpriseConfigKey,
+		Value: string(data),
+	})
+}
+
 // GetModelPrices retrieves all model pricing records from the database.
 func (s *RDBConfigStore) GetModelPrices(ctx context.Context) ([]tables.TableModelPricing, error) {
 	var modelPrices []tables.TableModelPricing

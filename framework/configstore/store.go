@@ -135,6 +135,10 @@ type ConfigStore interface {
 	GetConfig(ctx context.Context, key string) (*tables.TableGovernanceConfig, error)
 	UpdateConfig(ctx context.Context, config *tables.TableGovernanceConfig, tx ...*gorm.DB) error
 
+	// Enterprise config CRUD (stored as JSON in governance_config table)
+	GetEnterpriseConfig(ctx context.Context) (map[string]any, error)
+	UpdateEnterpriseConfig(ctx context.Context, config map[string]any) error
+
 	// Plugins CRUD
 	GetPlugins(ctx context.Context) ([]*tables.TablePlugin, error)
 	GetPlugin(ctx context.Context, name string) (*tables.TablePlugin, error)

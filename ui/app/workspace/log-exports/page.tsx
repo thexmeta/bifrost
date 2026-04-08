@@ -17,6 +17,7 @@ import { z } from "zod";
 
 const logExportsFormSchema = z.object({
 	enabled: z.boolean(),
+	storageType: z.enum(["s3", "gcs", "azure_blob"]),
 	bucket: z.string().min(1, "Bucket name is required"),
 	region: z.string().min(1, "Region is required"),
 	prefix: z.string(),
@@ -27,6 +28,24 @@ const logExportsFormSchema = z.object({
 
 type LogExportsFormValues = z.infer<typeof logExportsFormSchema>;
 
+const storageLabels: Record<string, string> = {
+	s3: "Amazon S3",
+	gcs: "Google Cloud Storage",
+	azure_blob: "Azure Blob Storage",
+};
+
+const storageCardTitles: Record<string, string> = {
+	s3: "S3 Export Configuration",
+	gcs: "GCS Export Configuration",
+	azure_blob: "Azure Blob Export Configuration",
+};
+
+const storageCardDescriptions: Record<string, string> = {
+	s3: "Configure Amazon S3 as the destination for log exports",
+	gcs: "Configure Google Cloud Storage as the destination for log exports",
+	azure_blob: "Configure Azure Blob Storage as the destination for log exports",
+};
+
 export default function LogExportsPage() {
 	const { data: config, isLoading } = useGetCoreConfigQuery({});
 	const [updateConfig, { isLoading: isUpdating }] = useUpdateCoreConfigMutation();
@@ -35,9 +54,11 @@ export default function LogExportsPage() {
 	const logExportsConfig = enterpriseConfig.log_exports || {};
 	const destinationConfig = logExportsConfig.destination?.config || {};
 	const scheduleConfig = logExportsConfig.schedule || {};
+	const destinationType = logExportsConfig.destination?.type ?? "s3";
 
 	const defaultValues: LogExportsFormValues = {
 		enabled: logExportsConfig.enabled ?? false,
+		storageType: (destinationType as "s3" | "gcs" | "azure_blob") ?? "s3",
 		bucket: destinationConfig.bucket ?? "",
 		region: destinationConfig.region ?? "us-east-1",
 		prefix: destinationConfig.prefix ?? "bifrost-logs/",
@@ -60,7 +81,7 @@ export default function LogExportsPage() {
 					log_exports: {
 						enabled: data.enabled,
 						destination: {
-							type: "s3",
+							type: data.storageType,
 							config: {
 								bucket: data.bucket,
 								region: data.region,
@@ -82,12 +103,6 @@ export default function LogExportsPage() {
 			});
 		}
 	};
-
-	const storageTypes = [
-		{ value: "s3", label: "Amazon S3" },
-		{ value: "gcs", label: "Google Cloud Storage" },
-		{ value: "azure_blob", label: "Azure Blob Storage" },
-	];
 
 	const formats = [
 		{ value: "json", label: "JSON" },
@@ -135,8 +150,8 @@ export default function LogExportsPage() {
 				<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 					<Card>
 						<CardHeader>
-							<CardTitle>S3 Export Configuration</CardTitle>
-							<CardDescription>Configure Amazon S3 as the destination for log exports</CardDescription>
+							<CardTitle>{storageCardTitles[form.watch("storageType")] ?? "Export Configuration"}</CardTitle>
+							<CardDescription>{storageCardDescriptions[form.watch("storageType")] ?? "Configure cloud storage destination for log exports"}</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<FormField
@@ -146,7 +161,7 @@ export default function LogExportsPage() {
 									<FormItem className="flex items-center justify-between rounded-lg border p-4">
 										<div className="space-y-0.5">
 											<FormLabel className="text-base">Enable Log Exports</FormLabel>
-											<FormDescription>Automatically export logs to S3</FormDescription>
+											<FormDescription>Automatically export logs to cloud storage</FormDescription>
 										</div>
 										<FormControl>
 											<Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -157,14 +172,40 @@ export default function LogExportsPage() {
 
 							<FormField
 								control={form.control}
+								name="storageType"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Storage Type</FormLabel>
+										<Select onValueChange={field.onChange} defaultValue={field.value}>
+											<FormControl>
+												<SelectTrigger data-testid="storage-type-select">
+													<SelectValue placeholder="Select storage type" />
+												</SelectTrigger>
+											</FormControl>
+											<SelectContent>
+												{storageLabels && Object.entries(storageLabels).map(([value, label]) => (
+													<SelectItem key={value} value={value}>
+														{label}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<FormDescription>Cloud storage provider for log exports</FormDescription>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
 								name="bucket"
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>S3 Bucket Name</FormLabel>
+										<FormLabel>Bucket Name</FormLabel>
 										<FormControl>
-											<Input placeholder="my-bifrost-logs-bucket" {...field} value={field.value ?? ""} />
+											<Input placeholder="my-bifrost-logs-bucket" {...field} value={field.value ?? ""} data-testid="bucket-input" />
 										</FormControl>
-										<FormDescription>Name of the S3 bucket to export logs to</FormDescription>
+										<FormDescription>Name of the storage bucket to export logs to</FormDescription>
 										<FormMessage />
 									</FormItem>
 								)}
@@ -175,11 +216,11 @@ export default function LogExportsPage() {
 								name="region"
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>AWS Region</FormLabel>
+										<FormLabel>Region</FormLabel>
 										<Select onValueChange={field.onChange} defaultValue={field.value}>
 											<FormControl>
-												<SelectTrigger>
-													<SelectValue placeholder="Select AWS region" />
+												<SelectTrigger data-testid="region-select">
+													<SelectValue placeholder="Select region" />
 												</SelectTrigger>
 											</FormControl>
 											<SelectContent>
@@ -190,7 +231,7 @@ export default function LogExportsPage() {
 												))}
 											</SelectContent>
 										</Select>
-										<FormDescription>Region where your S3 bucket is located</FormDescription>
+										<FormDescription>Region where your storage bucket is located</FormDescription>
 										<FormMessage />
 									</FormItem>
 								)}
@@ -201,9 +242,9 @@ export default function LogExportsPage() {
 								name="prefix"
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>S3 Prefix (Optional)</FormLabel>
+										<FormLabel>Prefix (Optional)</FormLabel>
 										<FormControl>
-											<Input placeholder="bifrost-logs/" {...field} value={field.value ?? ""} />
+											<Input placeholder="bifrost-logs/" {...field} value={field.value ?? ""} data-testid="prefix-input" />
 										</FormControl>
 										<FormDescription>Path prefix for exported logs (e.g., bifrost-logs/)</FormDescription>
 										<FormMessage />

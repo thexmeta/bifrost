@@ -33,19 +33,17 @@ const nextConfig: NextConfig = {
 	webpack: (config) => {
 		config.resolve = config.resolve || {};
 		config.resolve.alias = config.resolve.alias || {};
-		config.resolve.alias["@enterprise"] = isEnterpriseBuild
-			? path.join(__dirname, "app", "enterprise")
-			: path.join(__dirname, "app", "_fallbacks", "enterprise");
-		config.resolve.alias["@schemas"] = isEnterpriseBuild
-			? path.join(__dirname, "app", "enterprise", "lib", "schemas")
-			: path.join(__dirname, "app", "_fallbacks", "enterprise", "lib", "schemas");		
+		// In enterprise build, use the fallbacks directory which contains the actual components
+		// (the _fallbacks naming is historical — these ARE the enterprise components)
+		config.resolve.alias["@enterprise"] = path.join(__dirname, "app", "_fallbacks", "enterprise");
+		config.resolve.alias["@schemas"] = path.join(__dirname, "app", "_fallbacks", "enterprise", "lib");
 		// Ensure modules are resolved from the main project's node_modules
 		config.resolve.modules = [
 			path.join(__dirname, "node_modules"),
 			"node_modules",
-		];		
+		];
 		// Ensure symlinks are resolved correctly
-		config.resolve.symlinks = true;		
+		config.resolve.symlinks = true;
 		return config;
 	},
 };

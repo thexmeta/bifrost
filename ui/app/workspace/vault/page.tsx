@@ -7,10 +7,11 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useGetPluginQuery, useUpdatePluginMutation } from "@/lib/store";
+import { useGetCoreConfigQuery, useUpdateCoreConfigMutation } from "@/lib/store";
 import { getErrorMessage } from "@/lib/store";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Info, Vault } from "lucide-react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -27,38 +28,52 @@ const vaultFormSchema = z.object({
 type VaultFormValues = z.infer<typeof vaultFormSchema>;
 
 export default function VaultConfigurationPage() {
-	const { data: pluginData, isLoading } = useGetPluginQuery("vault");
-	const [updatePlugin, { isLoading: isUpdating }] = useUpdatePluginMutation();
+	const { data: config, isLoading } = useGetCoreConfigQuery({ fromDB: true });
+	const [updateConfig, { isLoading: isUpdating }] = useUpdateCoreConfigMutation();
 
-	const defaultValues: VaultFormValues = {
-		enabled: pluginData?.config?.enabled ?? false,
-		type: pluginData?.config?.type ?? "hashicorp",
-		address: pluginData?.config?.address ?? "",
-		token: pluginData?.config?.token ?? "",
-		sync_paths: pluginData?.config?.sync_paths?.join(", ") ?? "bifrost/*",
-		sync_interval_seconds: pluginData?.config?.sync_interval_seconds ?? 300,
-	};
+	const vaultConfig = config?.enterprise?.vault || {};
 
 	const form = useForm<VaultFormValues>({
 		resolver: zodResolver(vaultFormSchema),
-		defaultValues,
+		defaultValues: {
+			enabled: vaultConfig.enabled ?? false,
+			type: vaultConfig.type ?? "hashicorp",
+			address: vaultConfig.address ?? "",
+			token: vaultConfig.token ?? "",
+			sync_paths: vaultConfig.sync_paths?.join(", ") ?? "bifrost/*",
+			sync_interval_seconds: vaultConfig.sync_interval_seconds ?? 300,
+		},
 	});
+
+	useEffect(() => {
+		if (vaultConfig) {
+			form.reset({
+				enabled: vaultConfig.enabled ?? false,
+				type: vaultConfig.type ?? "hashicorp",
+				address: vaultConfig.address ?? "",
+				token: vaultConfig.token ?? "",
+				sync_paths: vaultConfig.sync_paths?.join(", ") ?? "bifrost/*",
+				sync_interval_seconds: vaultConfig.sync_interval_seconds ?? 300,
+			});
+		}
+	}, [vaultConfig, form]);
 
 	const onSubmit = async (data: VaultFormValues) => {
 		try {
-			await updatePlugin({
-				name: "vault",
-				data: {
-					enabled: data.enabled,
-					config: {
+			await updateConfig({
+				...config,
+				enterprise: {
+					...config?.enterprise,
+					vault: {
+						enabled: data.enabled,
 						type: data.type,
 						address: data.address,
 						token: data.token,
-						sync_paths: data.sync_paths?.split(",").map((s) => s.trim()).filter(Boolean),
+						sync_paths: data.sync_paths?.split(",").map((s: string) => s.trim()).filter(Boolean),
 						sync_interval_seconds: data.sync_interval_seconds,
 					},
 				},
-			}).unwrap();
+			} as any).unwrap();
 			toast.success("Vault configuration updated successfully");
 		} catch (error) {
 			toast.error("Failed to update Vault configuration", {
@@ -79,7 +94,7 @@ export default function VaultConfigurationPage() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-6" data-testid="vault-page">
 			<div>
 				<h1 className="text-2xl font-bold">Vault Integration</h1>
 				<p className="text-muted-foreground">Configure secret management integration for secure API key storage</p>
@@ -114,7 +129,7 @@ export default function VaultConfigurationPage() {
 											<FormDescription>Synchronize secrets from your vault</FormDescription>
 										</div>
 										<FormControl>
-											<Switch checked={field.value} onCheckedChange={field.onChange} />
+											<Switch checked={field.value} onCheckedChange={field.onChange} data-testid="vault-enabled-toggle" />
 										</FormControl>
 									</FormItem>
 								)}
@@ -128,7 +143,7 @@ export default function VaultConfigurationPage() {
 										<FormLabel>Vault Provider</FormLabel>
 										<Select onValueChange={field.onChange} defaultValue={field.value}>
 											<FormControl>
-												<SelectTrigger>
+												<SelectTrigger data-testid="vault-provider-select">
 													<SelectValue placeholder="Select vault provider" />
 												</SelectTrigger>
 											</FormControl>
@@ -153,7 +168,7 @@ export default function VaultConfigurationPage() {
 									<FormItem>
 										<FormLabel>Vault Address</FormLabel>
 										<FormControl>
-											<Input placeholder="https://vault.example.com" {...field} value={field.value ?? ""} />
+											<Input placeholder="https://vault.example.com" {...field} value={field.value ?? ""} data-testid="vault-address-input" />
 										</FormControl>
 										<FormDescription>URL of your Vault server (for HashiCorp Vault)</FormDescription>
 										<FormMessage />
@@ -168,7 +183,7 @@ export default function VaultConfigurationPage() {
 									<FormItem>
 										<FormLabel>Vault Token</FormLabel>
 										<FormControl>
-											<Input type="password" placeholder="Enter vault token" {...field} value={field.value ?? ""} />
+											<Input type="password" placeholder="Enter vault token" {...field} value={field.value ?? ""} data-testid="vault-token-input" />
 										</FormControl>
 										<FormDescription>Authentication token for Vault access</FormDescription>
 										<FormMessage />
@@ -183,7 +198,7 @@ export default function VaultConfigurationPage() {
 									<FormItem>
 										<FormLabel>Sync Paths</FormLabel>
 										<FormControl>
-											<Input placeholder="bifrost/*" {...field} value={field.value ?? ""} />
+											<Input placeholder="bifrost/*" {...field} value={field.value ?? ""} data-testid="vault-sync-paths-input" />
 										</FormControl>
 										<FormDescription>Comma-separated list of vault paths to sync (e.g., bifrost/*, api-keys/*)</FormDescription>
 										<FormMessage />
@@ -206,6 +221,7 @@ export default function VaultConfigurationPage() {
 												{...field}
 												onChange={(e) => field.onChange(parseInt(e.target.value) || 300)}
 												value={field.value ?? 300}
+												data-testid="vault-interval-input"
 											/>
 										</FormControl>
 										<FormDescription>How often to sync secrets from vault (60-3600 seconds)</FormDescription>
@@ -220,12 +236,13 @@ export default function VaultConfigurationPage() {
 						<Button
 							type="button"
 							variant="outline"
-							onClick={() => form.reset(defaultValues)}
+							onClick={() => form.reset()}
 							disabled={isUpdating || !form.formState.isDirty}
+							data-testid="vault-reset-button"
 						>
 							Reset
 						</Button>
-						<Button type="submit" disabled={isUpdating || !form.formState.isDirty}>
+						<Button type="submit" disabled={isUpdating || !form.formState.isDirty} data-testid="vault-save-button">
 							{isUpdating ? "Saving..." : "Save Configuration"}
 						</Button>
 					</div>
