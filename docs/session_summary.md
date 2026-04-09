@@ -14,6 +14,71 @@
 
 ---
 
+# Session Summary - Enterprise Features Fixes & Multi-Model VK Bug
+
+**Session ID:** enterprise-fixes-003
+**Date:** 2026-04-09
+**Status:** ✅ COMPLETE
+
+## Key Achievements
+
+### 1. Critical Bug Fix: Multi-Model Virtual Key Model Blocking
+**Root Cause:** `isModelAllowed()` in `plugins/governance/resolver.go` returned on the **first** provider config match instead of checking ALL matching provider configs. When a VK had multiple provider configs for the same provider (e.g., nvidia-nim with different models), only the first config's allowed_models was checked. All models in later configs were incorrectly blocked.
+**Fix:** Changed to iterate through ALL provider configs matching the provider, returning `true` if ANY config allows the model.
+**Impact:** All VKs with multiple provider configs per provider were broken — models beyond the first config were always blocked with 403.
+
+### 2. Enterprise UI Pages Fixed (4 pages)
+- **RBAC** (`/workspace/governance/rbac`): Replaced dead stub with functional config page (toggle, role input, save)
+- **Log Exports** (`/workspace/log-exports`): Added storage type selector (S3/GCS/Azure Blob) — was defined but never rendered
+- **Vault** (`/workspace/vault`): Fixed config path from plugin API → enterprise config API
+- **Datadog** (`/workspace/datadog`): Fixed config path from plugin API → enterprise config API
+
+### 3. Enterprise Backend Infrastructure Added
+- Added `GetEnterpriseConfig` / `UpdateEnterpriseConfig` to ConfigStore interface
+- Implemented in RDBConfigStore (JSON stored in governance_config table)
+- Updated config handler GET/PUT endpoints to support enterprise config
+- All enterprise features now persist to DB via `/api/config` endpoint
+
+### 4. Build System Fixes
+- Fixed `@enterprise` webpack alias (pointed to non-existent `ui/app/enterprise` → `_fallbacks/enterprise`)
+- Fixed `ui/package.json` copy-build script (Unix-only `rm/cp` → cross-platform `node scripts/copy-build.js`)
+- Added `transports/bifrost-http/handlers/enterprise_config_test.go` (3 Go tests)
+- Added `framework/configstore/enterprise_config_test.go` (5 Go tests)
+- Added React unit tests for RBAC (7), Log Exports (7), Vault (8), Datadog (10) pages
+
+### 5. Build & Deploy Script Fixes (from previous session)
+- Fixed path error: `transports\bifrost-http` → `..\transports\bifrost-http`
+- Removed stale `providers/nvidia` go.mod dependency (actual name is `nvidianim`)
+- Fixed duplicate virtual key name collision (vk-tool-engine renamed from "EmbedEngine" to "ToolEngine")
+
+## Lines of Code
+
+| Category | Added | Modified |
+|----------|-------|----------|
+| **Bug Fix** | ~10 lines | 1 file (resolver.go) |
+| **UI Pages** | ~200 lines | 4 files |
+| **Backend** | ~80 lines | 3 files |
+| **Tests (Go)** | ~200 lines | 2 new files |
+| **Tests (React)** | ~300 lines | 4 new files |
+| **Build System** | ~30 lines | 2 files |
+| **Total** | ~820 lines added | ~12 files modified |
+
+## Why: Architectural Decisions
+
+### 1. isModelAllowed Multi-Config Check
+The original design assumed one provider config per provider per VK. In practice, users create multiple configs for the same provider with different models and different keys (for cost optimization, rate limiting per model). The fix preserves backward compatibility — if only one config exists, behavior is identical. With multiple configs, the model is now allowed if ANY config permits it.
+
+### 2. Enterprise Config via /api/config
+Rather than creating separate API endpoints for each enterprise feature, we route all enterprise config through the existing `/api/config` PUT endpoint with an `enterprise` field. This keeps the API surface small and ensures all config changes are atomic.
+
+## Known Issues / Notes
+
+1. **Virtual Keys Without Keys:** VKs with provider configs but no `"keys"` arrays in those configs will pass model checks but fail with "no keys found that support model". Users must add `"keys"` to each provider config in config.json or via the UI.
+2. **Direct Key Mode:** Users can bypass VKs entirely by setting `"allow_direct_keys": true` in client_config and passing provider API keys via `Authorization: Bearer <key>`.
+3. **No-Auth Mode:** Without VKs or direct keys, Bifrost auto-selects from provider-level keys configured in `providers.<name>.keys`.
+
+---
+
 ## Key Achievements
 
 ### 1. Enterprise License Features Enabled
