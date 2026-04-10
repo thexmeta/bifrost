@@ -19,7 +19,7 @@ import (
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/encrypt"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
-	"github.com/maximhq/bifrost/plugins/litellmcompat"
+	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/transports/bifrost-http/lib"
 	"github.com/valyala/fasthttp"
 )
@@ -88,7 +88,7 @@ func (h *ConfigHandler) getVersion(ctx *fasthttp.RequestCtx) {
 
 // getConfig handles GET /config - Get the current configuration
 func (h *ConfigHandler) getConfig(ctx *fasthttp.RequestCtx) {
-	var mapConfig = make(map[string]any)
+	mapConfig := make(map[string]any)
 
 	if query := string(ctx.QueryArgs().Peek("from_db")); query == "true" {
 		if h.store.ConfigStore == nil {
@@ -342,22 +342,33 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		updatedConfig.MaxRequestBodySizeMB = payload.ClientConfig.MaxRequestBodySizeMB
 	}
 
-	// Handle LiteLLM compat plugin toggle
-	if payload.ClientConfig.EnableLiteLLMFallbacks != currentConfig.EnableLiteLLMFallbacks {
-		if payload.ClientConfig.EnableLiteLLMFallbacks {
-			// Load and register the litellmcompat plugin
-			if err := h.configManager.ReloadPlugin(ctx, "litellmcompat", nil, &litellmcompat.Config{Enabled: true}, nil, nil); err != nil {
-				logger.Warn(fmt.Sprintf("failed to load litellmcompat plugin: %v", err))
+	// Handle compat plugin toggle
+	newCompat := payload.ClientConfig.Compat
+	oldCompat := currentConfig.Compat
+	if newCompat != oldCompat {
+		newEnabled := newCompat.ConvertTextToChat || newCompat.ConvertChatToResponses || newCompat.ShouldDropParams || newCompat.ShouldConvertParams
+		if newEnabled {
+			compatCfg := &compat.Config{
+				ConvertTextToChat:      newCompat.ConvertTextToChat,
+				ConvertChatToResponses: newCompat.ConvertChatToResponses,
+				ShouldDropParams:       newCompat.ShouldDropParams,
+				ShouldConvertParams:    newCompat.ShouldConvertParams,
+			}
+			if err := h.configManager.ReloadPlugin(ctx, compat.PluginName, nil, compatCfg, nil, nil); err != nil {
+				logger.Warn("failed to load compat plugin: %v", err)
+				SendError(ctx, 400, "Failed to load compat plugin")
+				return
 			}
 		} else {
-			// Remove the litellmcompat plugin
 			disabledCtx := context.WithValue(ctx, PluginDisabledKey, true)
-			if err := h.configManager.RemovePlugin(disabledCtx, "litellmcompat"); err != nil {
-				logger.Warn("failed to remove litellmcompat plugin: %v", err)
+			if err := h.configManager.RemovePlugin(disabledCtx, compat.PluginName); err != nil {
+				logger.Warn("failed to remove compat plugin: %v", err)
+				SendError(ctx, 400, "Failed to remove compat plugin")
+				return
 			}
 		}
 	}
-	updatedConfig.EnableLiteLLMFallbacks = payload.ClientConfig.EnableLiteLLMFallbacks
+	updatedConfig.Compat = newCompat
 	// Only update MCP fields if explicitly provided (non-zero) to avoid clearing stored values
 	if payload.ClientConfig.MCPAgentDepth > 0 {
 		updatedConfig.MCPAgentDepth = payload.ClientConfig.MCPAgentDepth

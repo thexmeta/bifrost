@@ -14,8 +14,8 @@ require (
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/maximhq/bifrost/core v1.5.1
 	github.com/maximhq/bifrost/framework v1.3.1
+	github.com/maximhq/bifrost/plugins/compat v0.1.0
 	github.com/maximhq/bifrost/plugins/governance v1.5.1
-	github.com/maximhq/bifrost/plugins/litellmcompat v0.1.1
 	github.com/maximhq/bifrost/plugins/logging v1.5.1
 	github.com/maximhq/bifrost/plugins/maxim v1.6.1
 	github.com/maximhq/bifrost/plugins/otel v1.2.1

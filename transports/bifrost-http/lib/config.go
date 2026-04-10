@@ -36,8 +36,8 @@ import (
 	"github.com/maximhq/bifrost/framework/oauth2"
 	plugins "github.com/maximhq/bifrost/framework/plugins"
 	"github.com/maximhq/bifrost/framework/vectorstore"
+	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
-	"github.com/maximhq/bifrost/plugins/litellmcompat"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/maxim"
 	"github.com/maximhq/bifrost/plugins/otel"
@@ -107,7 +107,7 @@ func IsBuiltinPlugin(name string) bool {
 		name == prompts.PluginName ||
 		name == logging.PluginName ||
 		name == governance.PluginName ||
-		name == litellmcompat.PluginName ||
+		name == compat.PluginName ||
 		name == maxim.PluginName ||
 		name == semanticcache.PluginName ||
 		name == otel.PluginName
@@ -316,7 +316,6 @@ var DefaultClientConfig = configstore.ClientConfig{
 	MCPAgentDepth:                   10,
 	MCPToolExecutionTimeout:         30,
 	MCPCodeModeBindingLevel:         string(schemas.CodeModeBindingLevelServer),
-	EnableLiteLLMFallbacks:          false,
 	HideDeletedVirtualKeysInFilters: false,
 	RoutingChainMaxDepth:            governance.DefaultRoutingChainMaxDepth,
 }
