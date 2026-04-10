@@ -29,8 +29,8 @@ export const configApi = baseApi.injectEndpoints({
 			},
 			keepUnusedDataFor: 300, // Cache for 5 minutes (seconds)
 		}),
-		// Update core configuration
-		updateCoreConfig: builder.mutation<null, BifrostConfig>({
+		// Update core configuration (partial update — only provided fields are modified)
+		updateCoreConfig: builder.mutation<null, Partial<BifrostConfig>>({
 			query: (data) => ({
 				url: "/config",
 				method: "PUT",

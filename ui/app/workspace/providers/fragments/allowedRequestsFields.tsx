@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { BaseProvider, RequestType } from "@/lib/types/config";
 import { isRequestTypeDisabled } from "@/lib/utils/validation";
 import { Settings2 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Control, useFormContext } from "react-hook-form";
 
 interface AllowedRequestsFieldsProps {
@@ -92,15 +92,22 @@ export function AllowedRequestsFields({
 }: AllowedRequestsFieldsProps) {
 	const leftColumn = RequestTypes.slice(0, RequestTypes.length / 2);
 	const rightColumn = RequestTypes.slice(RequestTypes.length / 2);
-	const { getValues, setValue } = useFormContext();
+	const { setValue } = useFormContext();
 
 	// Reset disabled fields when providerType changes
+	// Note: Only updates fields when providerType actually changes (not on initial mount).
+	// On mount, the form's defaultValues already set the correct values.
+	const isFirstRender = useRef(true);
 	useEffect(() => {
+		if (isFirstRender.current) {
+			isFirstRender.current = false;
+			return;
+		}
 		RequestTypes.forEach(({ key }) => {
 			const fieldName = `${namePrefix}.${key}`;
-			setValue(fieldName, !isRequestTypeDisabled(providerType, key), { shouldDirty: true });
+			setValue(fieldName, !isRequestTypeDisabled(providerType, key));
 		});
-	}, [providerType, namePrefix, setValue, getValues]);
+	}, [providerType, namePrefix, setValue]);
 
 	const isPathOverrideDisabled = useMemo(() => providerType === "gemini" || providerType === "bedrock", [providerType]);
 
