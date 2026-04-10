@@ -85,8 +85,10 @@ if (-not $NoStop) {
 # Step 2: Build the binary
 Write-Host "Step 2: Building bifrost-http..." -ForegroundColor Green
 
-$BuildDir = "..\transports\bifrost-http"
-$OutputPath = "tmp\bifrost-http.exe"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ProjectRoot = Join-Path $ScriptDir ".."
+$BuildDir = Join-Path $ProjectRoot "transports\bifrost-http"
+$OutputPath = Join-Path $ProjectRoot "tmp\bifrost-http.exe"
 
 # Check if Go is installed
 $goVersion = go version 2>$null
@@ -104,14 +106,14 @@ $buildArgs = @(
     "-a",
     "-trimpath",
     "-tags", "sqlite_static",
-    "-o", "..\..\$OutputPath",
+    "-o", $OutputPath,
     "."
 )
 
 Set-Location $BuildDir
 & go @buildArgs
 $buildExitCode = $LASTEXITCODE
-Set-Location ..\..
+Set-Location $ProjectRoot
 
 if ($buildExitCode -ne 0) {
     Write-Host "ERROR: Build failed with exit code $buildExitCode" -ForegroundColor Red
