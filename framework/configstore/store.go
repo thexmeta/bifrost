@@ -249,6 +249,25 @@ type ConfigStore interface {
 	DeleteSession(ctx context.Context, token string) error
 	FlushSessions(ctx context.Context) error
 
+	// RBAC - Roles
+	GetRoles(ctx context.Context) ([]tables.TableRole, error)
+	GetRole(ctx context.Context, id string) (*tables.TableRole, error)
+	CreateRole(ctx context.Context, role *tables.TableRole, tx ...*gorm.DB) error
+	UpdateRole(ctx context.Context, role *tables.TableRole, tx ...*gorm.DB) error
+	DeleteRole(ctx context.Context, id string, tx ...*gorm.DB) error
+	GetDefaultRole(ctx context.Context) (*tables.TableRole, error)
+
+	// RBAC - Role Permissions
+	GetRolePermissions(ctx context.Context, roleID string) ([]tables.TableRolePermission, error)
+	UpsertRolePermission(ctx context.Context, perm *tables.TableRolePermission, tx ...*gorm.DB) error
+	DeleteRolePermission(ctx context.Context, roleID string, resource string, operation string, tx ...*gorm.DB) error
+
+	// RBAC - User Roles
+	GetUserRoles(ctx context.Context, userID string) ([]tables.TableRole, error)
+	AssignUserRole(ctx context.Context, userID string, roleID string, tx ...*gorm.DB) error
+	RemoveUserRole(ctx context.Context, userID string, roleID string, tx ...*gorm.DB) error
+	CheckUserPermission(ctx context.Context, userID string, resource string, operation string) (bool, error)
+
 	// Model pricing CRUD
 	GetModelPrices(ctx context.Context) ([]tables.TableModelPricing, error)
 	UpsertModelPrices(ctx context.Context, pricing *tables.TableModelPricing, tx ...*gorm.DB) error

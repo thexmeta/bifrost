@@ -54,6 +54,10 @@ func newSqliteConfigStore(ctx context.Context, config *SQLiteConfig, logger sche
 	if err := triggerMigrations(ctx, db); err != nil {
 		return nil, err
 	}
+	// Seed default RBAC roles
+	if err := migrationSeedRBACRoles(ctx, db); err != nil {
+		return nil, fmt.Errorf("failed to seed RBAC roles: %w", err)
+	}
 	// Encrypt any plaintext rows if encryption is enabled
 	if err := s.EncryptPlaintextRows(ctx); err != nil {
 		return nil, fmt.Errorf("failed to encrypt plaintext rows: %w", err)

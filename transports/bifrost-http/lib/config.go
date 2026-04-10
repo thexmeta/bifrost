@@ -4094,11 +4094,19 @@ func ValidateCustomProvider(config configstore.ProviderConfig, provider schemas.
 		return nil
 	}
 
-	if bifrost.IsStandardProvider(provider) {
-		return fmt.Errorf("custom provider validation failed: cannot be created on standard providers: %s", provider)
-	}
-
 	cpc := config.CustomProviderConfig
+
+	// For standard providers: only allowed_requests is allowed
+	if bifrost.IsStandardProvider(provider) {
+		if cpc.BaseProviderType != "" {
+			return fmt.Errorf("custom provider validation failed: standard providers cannot set base_provider_type: %s", provider)
+		}
+		if cpc.IsKeyLess {
+			return fmt.Errorf("custom provider validation failed: standard providers cannot set is_key_less: %s", provider)
+		}
+		// allowed_requests is allowed — no further validation needed
+		return nil
+	}
 
 	// Validate base provider type
 	if cpc.BaseProviderType == "" {
@@ -4122,6 +4130,11 @@ func ValidateCustomProvider(config configstore.ProviderConfig, provider schemas.
 func ValidateCustomProviderUpdate(newConfig, existingConfig configstore.ProviderConfig, provider schemas.ModelProvider) error {
 	// If neither config has CustomProviderConfig, no validation needed
 	if newConfig.CustomProviderConfig == nil && existingConfig.CustomProviderConfig == nil {
+		return nil
+	}
+
+	// For standard providers: skip all validation — allowed_requests is the only field we preserve
+	if bifrost.IsStandardProvider(provider) {
 		return nil
 	}
 
@@ -4329,4 +4342,162 @@ func DeepCopy[T any](in T) (T, error) {
 	}
 	err = sonic.Unmarshal(b, &out)
 	return out, err
+}
+
+func applyProviderPricingOverrides(catalog *modelcatalog.ModelCatalog, providers map[schemas.ModelProvider]configstore.ProviderConfig) {
+	if catalog == nil {
+		return
+	}
+	for provider, providerConfig := range providers {
+		if err := catalog.SetProviderPricingOverrides(provider, providerConfig.PricingOverrides); err != nil {
+			logger.Warn("failed to load pricing overrides for provider %s: %v", provider, err)
+		}
+	}
+}
+
+// WriteConfigToFile dumps the current in-memory configuration to config.json.
+// This enables two-way sync: config.json → DB on startup, DB → config.json on every mutation.
+// Written atomically (temp file + rename) to prevent corruption.
+// IMPORTANT: Existing providers in config.json that are NOT in memory are preserved (merge, not replace).
+func (c *Config) WriteConfigToFile() error {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	configPath := c.configPath
+	if configPath == "" {
+		return fmt.Errorf("config file path not set")
+	}
+
+	// Load existing config.json to preserve fields we don't manage
+	var existing map[string]any
+	existingData, err := os.ReadFile(configPath)
+	if err == nil && len(existingData) > 0 {
+		_ = json.Unmarshal(existingData, &existing)
+	}
+
+	// Marshal the parts we manage
+	cd := c.buildConfigDataForFile()
+	newBytes, err := json.MarshalIndent(cd, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	var newMap map[string]any
+	_ = json.Unmarshal(newBytes, &newMap)
+
+	// Merge: new values override existing, extra fields preserved
+	merged := existing
+	if merged == nil {
+		merged = make(map[string]any)
+	}
+	for k, v := range newMap {
+		merged[k] = v
+	}
+
+	// CRITICAL: Preserve existing providers from config.json that aren't in memory.
+	// This prevents data loss when a provider fails to load (e.g., missing env vars).
+	if existingProviders, ok := existing["providers"].(map[string]any); ok {
+		if newProviders, ok := merged["providers"].(map[string]any); ok {
+			for name, cfg := range existingProviders {
+				if _, exists := newProviders[name]; !exists {
+					newProviders[name] = cfg // Preserve missing provider
+				}
+			}
+		}
+	}
+
+	// Marshal final config
+	bytes, err := json.MarshalIndent(merged, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal merged config: %w", err)
+	}
+	bytes = append(bytes, '\n')
+
+	// Atomic write: write to temp file, then rename
+	dir := filepath.Dir(configPath)
+	tmpFile, err := os.CreateTemp(dir, "config-*.json.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp config file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	if _, err := tmpFile.Write(bytes); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to write temp config: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp config: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to rename temp config: %w", err)
+	}
+
+	logger.Info("config written to %s", configPath)
+	return nil
+}
+
+// buildConfigDataForFile constructs a ConfigData from the current in-memory state.
+func (c *Config) buildConfigDataForFile() *ConfigData {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	cd := &ConfigData{
+		Providers: make(map[string]configstore.ProviderConfig),
+	}
+
+	// Client config
+	if c.ClientConfig != nil {
+		cd.Client = c.ClientConfig
+	}
+
+	// Providers — include ALL providers from in-memory
+	for provider, cfg := range c.Providers {
+		cd.Providers[string(provider)] = cfg
+	}
+
+	// Governance config (VKs, budgets, rate limits, teams, customers)
+	if c.GovernanceConfig != nil {
+		cd.Governance = &configstore.GovernanceConfig{
+			VirtualKeys:  c.GovernanceConfig.VirtualKeys,
+			Budgets:      c.GovernanceConfig.Budgets,
+			RateLimits:   c.GovernanceConfig.RateLimits,
+			Teams:        c.GovernanceConfig.Teams,
+			Customers:    c.GovernanceConfig.Customers,
+			RoutingRules: c.GovernanceConfig.RoutingRules,
+		}
+	}
+
+	// MCP config
+	c.muMCP.RLock()
+	cd.MCP = c.MCPConfig
+	c.muMCP.RUnlock()
+
+	// Plugins
+	c.pluginsMu.Lock()
+	plugins := c.PluginConfigs
+	c.pluginsMu.Unlock()
+	cd.Plugins = plugins
+
+	return cd
+}
+
+// deepMergeConfig merges newConfig into existingConfig, preserving extra fields from existing.
+// newConfig values take precedence for overlapping keys.
+func deepMergeConfig(existing, newConfig map[string]any) *ConfigData {
+	// Apply new values over existing
+	for k, v := range newConfig {
+		existing[k] = v
+	}
+
+	// Re-serialize as JSON and parse back through ConfigData to ensure type safety
+	bytes, _ := json.Marshal(existing)
+	var cd ConfigData
+	if err := json.Unmarshal(bytes, &cd); err != nil {
+		logger.Warn("failed to re-parse merged config: %v, using new config only", err)
+		return nil
+	}
+	return &cd
 }

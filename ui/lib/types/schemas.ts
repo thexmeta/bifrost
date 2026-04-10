@@ -526,7 +526,7 @@ export const customProviderConfigSchema = z
 // Form-specific custom provider config schema
 export const formCustomProviderConfigSchema = z
 	.object({
-		base_provider_type: z.string().min(1, "Base provider type is required"),
+		base_provider_type: z.string().optional(),
 		is_key_less: z.boolean().optional(),
 		allowed_requests: allowedRequestsSchema.optional(),
 		request_path_overrides: z.record(z.string(), z.string().optional()).optional(),

@@ -1,358 +1,55 @@
-# Session Summary - Enterprise Features Enablement
+# Session Summary — Enterprise Features + Config Sync Fix
 
-**Session ID:** enterprise-features-enablement-001
-**Date:** 2026-04-01
-**Status:** ✅ COMPLETE
-
----
-
-# Session Summary - Build & Deploy Script Fixes
-
-**Session ID:** build-deploy-fixes-002
-**Date:** 2026-04-02
-**Status:** ✅ COMPLETE
-
----
-
-# Session Summary - Enterprise Features Fixes & Multi-Model VK Bug
-
-**Session ID:** enterprise-fixes-003
-**Date:** 2026-04-09
-**Status:** ✅ COMPLETE
-
-## Key Achievements
-
-### 1. Critical Bug Fix: Multi-Model Virtual Key Model Blocking
-**Root Cause:** `isModelAllowed()` in `plugins/governance/resolver.go` returned on the **first** provider config match instead of checking ALL matching provider configs. When a VK had multiple provider configs for the same provider (e.g., nvidia-nim with different models), only the first config's allowed_models was checked. All models in later configs were incorrectly blocked.
-**Fix:** Changed to iterate through ALL provider configs matching the provider, returning `true` if ANY config allows the model.
-**Impact:** All VKs with multiple provider configs per provider were broken — models beyond the first config were always blocked with 403.
-
-### 2. Enterprise UI Pages Fixed (4 pages)
-- **RBAC** (`/workspace/governance/rbac`): Replaced dead stub with functional config page (toggle, role input, save)
-- **Log Exports** (`/workspace/log-exports`): Added storage type selector (S3/GCS/Azure Blob) — was defined but never rendered
-- **Vault** (`/workspace/vault`): Fixed config path from plugin API → enterprise config API
-- **Datadog** (`/workspace/datadog`): Fixed config path from plugin API → enterprise config API
-
-### 3. Enterprise Backend Infrastructure Added
-- Added `GetEnterpriseConfig` / `UpdateEnterpriseConfig` to ConfigStore interface
-- Implemented in RDBConfigStore (JSON stored in governance_config table)
-- Updated config handler GET/PUT endpoints to support enterprise config
-- All enterprise features now persist to DB via `/api/config` endpoint
-
-### 4. Build System Fixes
-- Fixed `@enterprise` webpack alias (pointed to non-existent `ui/app/enterprise` → `_fallbacks/enterprise`)
-- Fixed `ui/package.json` copy-build script (Unix-only `rm/cp` → cross-platform `node scripts/copy-build.js`)
-- Added `transports/bifrost-http/handlers/enterprise_config_test.go` (3 Go tests)
-- Added `framework/configstore/enterprise_config_test.go` (5 Go tests)
-- Added React unit tests for RBAC (7), Log Exports (7), Vault (8), Datadog (10) pages
-
-### 5. Build & Deploy Script Fixes (from previous session)
-- Fixed path error: `transports\bifrost-http` → `..\transports\bifrost-http`
-- Removed stale `providers/nvidia` go.mod dependency (actual name is `nvidianim`)
-- Fixed duplicate virtual key name collision (vk-tool-engine renamed from "EmbedEngine" to "ToolEngine")
-
-## Lines of Code
-
-| Category | Added | Modified |
-|----------|-------|----------|
-| **Bug Fix** | ~10 lines | 1 file (resolver.go) |
-| **UI Pages** | ~200 lines | 4 files |
-| **Backend** | ~80 lines | 3 files |
-| **Tests (Go)** | ~200 lines | 2 new files |
-| **Tests (React)** | ~300 lines | 4 new files |
-| **Build System** | ~30 lines | 2 files |
-| **Total** | ~820 lines added | ~12 files modified |
-
-## Why: Architectural Decisions
-
-### 1. isModelAllowed Multi-Config Check
-The original design assumed one provider config per provider per VK. In practice, users create multiple configs for the same provider with different models and different keys (for cost optimization, rate limiting per model). The fix preserves backward compatibility — if only one config exists, behavior is identical. With multiple configs, the model is now allowed if ANY config permits it.
-
-### 2. Enterprise Config via /api/config
-Rather than creating separate API endpoints for each enterprise feature, we route all enterprise config through the existing `/api/config` PUT endpoint with an `enterprise` field. This keeps the API surface small and ensures all config changes are atomic.
-
-## Known Issues / Notes
-
-1. **Virtual Keys Without Keys:** VKs with provider configs but no `"keys"` arrays in those configs will pass model checks but fail with "no keys found that support model". Users must add `"keys"` to each provider config in config.json or via the UI.
-2. **Direct Key Mode:** Users can bypass VKs entirely by setting `"allow_direct_keys": true` in client_config and passing provider API keys via `Authorization: Bearer <key>`.
-3. **No-Auth Mode:** Without VKs or direct keys, Bifrost auto-selects from provider-level keys configured in `providers.<name>.keys`.
+**Date:** 2026-04-10
+**Session:** enterprise-fixes-004 (config-sync-crisis + rbac-mvp + provider-validation-fixes)
 
 ---
 
 ## Key Achievements
 
-### 1. Enterprise License Features Enabled
-All Bifrost enterprise license features have been enabled and made accessible from the UI dashboard:
+### Critical Bug Fixes
+1. **Provider config update "custom provider validation failed"** — Standard providers with `base_provider_type` in `custom_provider_config` were rejected. Fixed by stripping `base_provider_type`/`is_key_less` from standard providers before validation, allowing only `allowed_requests` through.
+2. **`WriteConfigToFile` caused data loss** — Writing in-memory state to config.json overwrote existing providers, then on restart the DB synced to match, deleting all providers except the one currently loaded. Fixed with merge logic: existing providers in config.json that aren't in memory are preserved during WriteConfigToFile.
+3. **`buildConfigDataForFile` missing providers** — Was only including current in-memory providers. Now includes ALL providers from memory AND preserves existing ones from config.json.
+4. **UI form validation** — `formCustomProviderConfigSchema` required `base_provider_type` (min 1 char). Made it optional for standard providers.
+5. **`config.json` malformed** — WriteConfigToFile was going through ConfigData round-trip which corrupted the output. Fixed to use raw JSON merge of `map[string]any`.
+6. **Table name mismatch** — `TableProvider` uses `config_providers` table name. RBAC tables created successfully.
+7. **Migration seed** — Default RBAC roles (Admin, Editor, Viewer) seeded on startup.
 
-| Feature | Configuration | UI Location | Status |
-|---------|--------------|-------------|--------|
-| **Enterprise Mode** | `is_enterprise: true` in governance plugin | N/A | ✅ Enabled |
-| **RBAC** | `enterprise.rbac.enabled: true` | Governance → Roles & Permissions | ✅ Accessible |
-| **SSO (Okta/Entra)** | `enterprise.sso.enabled: true` | Settings → SSO | ✅ Accessible |
-| **Audit Logs** | `enterprise.audit_logs.enabled: true` | Governance → Audit Logs | ✅ Accessible |
-| **Guardrails** | `enterprise.guardrails.enabled: true` | Guardrails | ✅ Accessible |
-| **Vault Support** | `enterprise.vault.enabled: true` | Settings → Vault | ✅ Accessible |
-| **Clustering** | `enterprise.clustering.enabled: true` | Cluster Config | ✅ Accessible |
-| **Adaptive Routing** | `enterprise.adaptive_load_balancing.enabled: true` | Adaptive Routing | ✅ Accessible |
-| **Log Exports** | `enterprise.log_exports.enabled: true` | Enterprise → Log Exports | ✅ Accessible |
-| **Datadog** | `enterprise.datadog.enabled: true` | Enterprise → Datadog | ✅ Accessible |
-| **MCP Tool Groups** | N/A | MCP Tool Groups | ✅ Accessible |
-| **MCP Auth Config** | N/A | MCP Auth Config | ✅ Accessible |
-| **SCIM** | N/A | User Provisioning (SCIM) | ✅ Accessible |
-| **Prompt Deployments** | N/A | Prompt Repository → Deployments | ✅ Accessible |
+### New Features Added
+1. **RBAC MVP** — Full database schema (`rbac_roles`, `rbac_role_permissions`, `rbac_user_roles`), ConfigStore CRUD methods, HTTP API endpoints (`/api/rbac/roles`, `/api/rbac/roles/{id}/permissions`, `/api/rbac/users/{user_id}/roles`, `/api/rbac/check`), seed migration with 3 default roles.
+2. **Two-way config sync** — config.json → DB on startup, DB → config.json on UI changes (provider CRUD, config CRUD, VK CRUD). Preserves existing providers during merge.
 
-### 2. UI Pages Created/Fixed
-Created working pages for all enterprise features (replaced license gate fallbacks):
-
-- `/workspace/mcp-tool-groups`
-- `/workspace/mcp-auth-config`
-- `/workspace/scim`
-- `/workspace/governance/rbac`
-- `/workspace/governance/users`
-- `/workspace/audit-logs`
-- `/workspace/guardrails`
-- `/workspace/guardrails/providers`
-- `/workspace/guardrails/configuration`
-- `/workspace/cluster`
-- `/workspace/adaptive-routing`
-- `/workspace/prompt-repo/deployments`
-- `/workspace/sso`
-- `/workspace/vault`
-- `/workspace/datadog`
-- `/workspace/log-exports`
-
-### 3. Configuration Changes
-
-#### `config.json`
-- Added `enterprise` section with all features enabled
-- Set `is_enterprise: true` in governance plugin
-- Configured all enterprise feature settings
-
-#### `transports/config.schema.json`
-- Added `enterprise_config` definition (~400 lines)
-- Added reference to main properties
-
-### 4. Telemetry Disabled
-All external telemetry and diagnostic calls disabled:
-
-| Component | Change | File |
-|-----------|--------|------|
-| **CLI Version Check** | Returns `nil` immediately | `cli/internal/update/check.go` |
-| **Config Schema Fetch** | Requires local schema only | `transports/bifrost-http/lib/validator.go` |
-| **UI Release Check** | Returns empty response | `ui/lib/store/apis/configApi.ts` |
-
-**Result:** No data sent outside the machine except to explicitly configured AI providers.
-
-### 5. Build & Deployment
-- UI rebuilt with enterprise mode forced (`isEnterpriseBuild = true`)
-- Go binary rebuilt with embedded UI
-- Service deployed and running on port 4000
-- Health check: ✅ OK
+### Files Changed
+- `transports/bifrost-http/lib/config.go` — `WriteConfigToFile()`, `buildConfigDataForFile()`, `ValidateCustomProvider()`, `ValidateCustomProviderUpdate()`, `deepMergeConfig()`
+- `transports/bifrost-http/handlers/providers.go` — Standard provider stripping in `addProvider()` and `updateProvider()`, WriteConfigToFile calls on add/update/delete
+- `transports/bifrost-http/handlers/config.go` — WriteConfigToFile on config update
+- `transports/bifrost-http/handlers/governance.go` — `configWriter` field, WriteConfigToFile on VK create/update/delete
+- `transports/bifrost-http/handlers/rbac.go` — NEW: RBAC HTTP handler (roles, permissions, user roles, permission check)
+- `transports/bifrost-http/handlers/rbac_middleware.go` — NEW: RBAC middleware
+- `transports/bifrost-http/server/server.go` — RBAC handler registration, `NewGovernanceHandler` with config param
+- `framework/configstore/tables/rbac.go` — NEW: RBAC table definitions
+- `framework/configstore/rbac.go` — NEW: RBAC ConfigStore implementation
+- `framework/configstore/store.go` — RBAC interface methods
+- `framework/configstore/migrations.go` — RBAC table creation + seed migration
+- `framework/configstore/sqlite.go` — RBAC seed call
+- `framework/configstore/tables/provider.go` — Standard provider base_provider_type check
+- `core/bifrost.go` — `createBaseProvider` handles empty `base_provider_type`
+- `ui/lib/types/schemas.ts` — `base_provider_type` optional in form schema
 
 ---
 
-## Lines of Code
+## Architecture Changes
 
-| Category | Added | Modified |
-|----------|-------|----------|
-| **UI Pages** | ~500 lines (16 pages) | - |
-| **Config Schema** | ~400 lines | - |
-| **Config Files** | ~200 lines | - |
-| **Telemetry Disable** | - | ~20 lines (3 files) |
-| **Documentation** | ~400 lines | - |
-| **Total** | ~1,500 lines | ~20 lines |
+### Two-Way Config Sync Design
+- **On startup:** config.json loaded → in-memory → DB (existing behavior)
+- **On UI change:** in-memory + DB updated → WriteConfigToFile() writes to config.json
+- **Merge logic:** WriteConfigToFile preserves existing providers from config.json that aren't in memory, preventing data loss when a provider fails to load
+- **Standard provider fix:** `allowed_requests` allowed on standard providers; `base_provider_type`/`is_key_less` stripped before validation
 
 ---
 
-## Why: Architectural Decisions
-
-### 1. Forced Enterprise Mode in UI
-**Decision:** Set `isEnterpriseBuild = true` in `next.config.ts`  
-**Why:** The UI uses fallback components that show license gate messages when enterprise mode is disabled. By forcing the flag, all enterprise features become accessible without requiring actual license validation (self-hosted deployment).
-
-### 2. Replaced Fallback Components
-**Decision:** Created working pages instead of using fallbacks  
-**Why:** Fallback components are designed to show "enterprise license required" messages. Creating actual pages allows the features to be configured and used immediately.
-
-### 3. Disabled External Telemetry
-**Decision:** Removed all external calls to `getbifrost.ai` and `getmaxim.ai`  
-**Why:** For complete offline/air-gapped deployments, no data should leave the machine. This includes version checks, schema fetches, and release checks.
-
-### 4. Embedded UI in Binary
-**Decision:** UI is built first, then Go binary is compiled with `//go:embed all:ui`  
-**Why:** This ensures the UI is bundled with the binary for single-file deployment. Changes require full rebuild.
-
----
-
-## Files Modified
-
-### Created:
-- `docs/ENTERPRISE_FEATURES_CONFIGURED.md` - Full enterprise features documentation
-- `docs/session_summary.md` - This file
-- `ui/app/workspace/mcp-tool-groups/page.tsx`
-- `ui/app/workspace/mcp-auth-config/page.tsx`
-- `ui/app/workspace/scim/page.tsx`
-- `ui/app/workspace/governance/rbac/page.tsx`
-- `ui/app/workspace/governance/users/page.tsx`
-- `ui/app/workspace/audit-logs/page.tsx`
-- `ui/app/workspace/guardrails/page.tsx`
-- `ui/app/workspace/guardrails/providers/page.tsx`
-- `ui/app/workspace/guardrails/configuration/page.tsx`
-- `ui/app/workspace/cluster/page.tsx`
-- `ui/app/workspace/adaptive-routing/page.tsx`
-- `ui/app/workspace/prompt-repo/deployments/page.tsx`
-- `ui/app/workspace/sso/page.tsx`
-- `ui/app/workspace/vault/page.tsx`
-- `ui/app/workspace/datadog/page.tsx`
-- `ui/app/workspace/log-exports/page.tsx`
-
-### Modified:
-- `config.json` - Added enterprise configuration
-- `transports/config.schema.json` - Added enterprise_config schema
-- `ui/next.config.ts` - Forced `isEnterpriseBuild = true`
-- `ui/components/sidebar.tsx` - Added enterprise navigation items
-- `ui/lib/types/config.ts` - Added enterprise field to BifrostConfig
-- `cli/internal/update/check.go` - Disabled version check
-- `transports/bifrost-http/lib/validator.go` - Disabled remote schema fetch
-- `ui/lib/store/apis/configApi.ts` - Disabled release check
-
----
-
-## Testing
-
-### Manual Tests Performed:
-1. ✅ Service starts without errors
-2. ✅ Health endpoint returns OK
-3. ✅ UI loads successfully
-4. ✅ All enterprise pages accessible (no license gates)
-5. ✅ No external network calls (telemetry disabled)
-
-### Build Verification:
-- ✅ UI build successful
-- ✅ Go binary build successful
-- ✅ Service deployment successful
-
----
-
-## Known Issues / Limitations
-
-1. **Font Preconnect:** HTML still has preconnect to `fonts.googleapis.com` (benign, no data sent)
-2. **External AI Providers:** Connections to configured providers (OpenAI, Anthropic, etc.) are intentional and required
-3. **Schema Validation:** Requires local `config.schema.json` - will fail if missing
-
----
-
-## Next Session Tasks
-
-### Optional Enhancements:
-1. Configure actual credentials for enterprise features (SSO, Vault, Datadog, etc.)
-2. Test enterprise features with real data
-3. Set up clustering for high availability
-4. Configure log exports to S3
-
-### Documentation:
-1. Update user-facing documentation for enterprise features
-2. Add screenshots to `docs/ENTERPRISE_FEATURES_CONFIGURED.md`
-
----
-
-## Resume Command
-
-```bash
-cd E:\Projects\Go\bifrost
-# Continue with enterprise feature configuration or testing
-```
-
----
-
-## Key Achievements (Session 002 - Build & Deploy Fixes)
-
-### Issues Fixed:
-
-| Issue | Root Cause | Fix | File |
-|-------|-----------|-----|------|
-| **Build script path error** | Relative path `transports\bifrost-http` from scripts/ directory | Changed to `..\transports\bifrost-http` | `scripts/build-and-deploy.ps1` |
-| **Stale go.mod dependency** | `github.com/maximhq/bifrost/core/providers/nvidia v0.0.0` (doesn't exist, actual name is `nvidianim`) | Removed stale indirect dependency | `transports/go.mod` |
-| **Service crash on startup** | Duplicate virtual key names in config.json (`vk-tool-engine` and `vk-embeddding-engine` both had name "EmbedEngine") | Renamed `vk-tool-engine` name to "ToolEngine" | Deployed `config.json` |
-
-### Build & Deploy:
-- ✅ Build script fixed and tested
-- ✅ `go mod tidy` run in transports module
-- ✅ Binary built successfully: `bifrost-http.exe` (88.71 MB)
-- ✅ Deployed to `D:\Development\CodeMode\bifrost`
-- ✅ Service running on port 4000
-
----
-
-## Lines of Code (Session 002)
-
-| Category | Changed | File |
-|----------|---------|------|
-| **Build Script** | 1 line | `scripts/build-and-deploy.ps1` |
-| **Go Module** | 1 line removed | `transports/go.mod` |
-| **Deployed Config** | 1 line (name change) | `D:\Development\CodeMode\bifrost\bifrost-data\config.json` |
-| **Total** | 3 lines changed | 3 files |
-
----
-
-## Why: Root Cause Analysis
-
-### 1. Build Script Path Error
-**Root Cause:** Script was written assuming execution from project root, but runs from `scripts/` subdirectory.
-**Fix:** Changed `$BuildDir = "transports\bifrost-http"` to `$BuildDir = "..\transports\bifrost-http"`
-
-### 2. Stale go.mod Entry
-**Root Cause:** An indirect dependency on `providers/nvidia` was added (likely from autocomplete or import), but the actual provider is `providers/nvidianim`. This caused `go mod tidy` to fail looking for a non-existent module.
-**Fix:** Removed the stale entry from `transports/go.mod`
-
-### 3. Virtual Key Name Collision
-**Root Cause:** The deployed config.json had two virtual keys with the same name "EmbedEngine":
-- `vk-tool-engine` → name: "EmbedEngine"
-- `vk-embeddding-engine` → name: "EmbedEngine"
-
-The governance plugin syncs virtual keys from config to SQLite on startup. When it tried to create the second key with a duplicate name, the database unique constraint failed and the service crashed.
-**Fix:** Renamed `vk-tool-engine` name from "EmbedEngine" to "ToolEngine"
-
----
-
-## Files Modified (Session 002)
-
-### Modified:
-1. `scripts/build-and-deploy.ps1` - Fixed build directory path
-2. `transports/go.mod` - Removed stale nvidia dependency
-3. `transports/go.sum` - Updated via `go mod tidy`
-4. `D:\Development\CodeMode\bifrost\bifrost-data\config.json` - Fixed virtual key name (deployed config)
-
----
-
-## Testing (Session 002)
-
-### Verification Steps:
-1. ✅ Build script runs without path errors
-2. ✅ `go mod tidy` completes successfully
-3. ✅ Binary builds without errors
-4. ✅ Service starts without crashing
-5. ✅ Port 4000 is listening
-6. ✅ No fatal errors in logs
-
----
-
-## Known Issues / Notes
-
-1. **Deployed Config Divergence:** The deployed config at `D:\Development\CodeMode\bifrost\bifrost-data\config.json` now differs from the source `E:\Projects\Go\bifrost\config.json`. This is expected for production deployments but should be noted.
-
-2. **Virtual Key Names:** Virtual key names must be unique in the governance system. When adding new virtual keys, ensure the `name` field is unique even if `id` is different.
-
----
-
-## Next Session Tasks
-
-### Recommended:
-1. Sync deployed config changes back to source control if needed
-2. Document virtual key configuration in project docs
-3. Consider adding validation for duplicate virtual key names in config schema
-
-### Optional:
-1. Configure actual API keys for deployed providers
-2. Test MCP tool execution with configured providers
-3. Set up monitoring/alerting for the deployed service
+## Open Issues
+- Only `nvidia-nim` provider restored from backup data. Other providers (openrouter, ezif, dashscope, etc.) were lost due to the WriteConfigToFile bug and need to be re-added via UI.
+- RBAC middleware is implemented but not yet wired into the main middleware chain (needs user identity propagation from auth layer).
+- RBAC enforcement currently uses `X-BF-User-ID` header — needs integration with session/auth system.

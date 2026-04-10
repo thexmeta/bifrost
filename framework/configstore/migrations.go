@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/google/uuid"
@@ -742,6 +743,22 @@ func migrationInit(ctx context.Context, db *gorm.DB) error {
 			}
 			if !migrator.HasTable(&tables.TableMCPClient{}) {
 				if err := migrator.CreateTable(&tables.TableMCPClient{}); err != nil {
+					return err
+				}
+			}
+			// RBAC tables
+			if !migrator.HasTable(&tables.TableRole{}) {
+				if err := migrator.CreateTable(&tables.TableRole{}); err != nil {
+					return err
+				}
+			}
+			if !migrator.HasTable(&tables.TableRolePermission{}) {
+				if err := migrator.CreateTable(&tables.TableRolePermission{}); err != nil {
+					return err
+				}
+			}
+			if !migrator.HasTable(&tables.TableUserRole{}) {
+				if err := migrator.CreateTable(&tables.TableUserRole{}); err != nil {
 					return err
 				}
 			}
@@ -6999,6 +7016,87 @@ func migrationAddOCRPricingColumns(ctx context.Context, db *gorm.DB) error {
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running add_ocr_pricing_columns migration: %s", err.Error())
+	}
+	return nil
+}
+
+// migrationSeedRBACRoles seeds the default RBAC roles (Admin, Editor, Viewer)
+func migrationSeedRBACRoles(ctx context.Context, db *gorm.DB) error {
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: "seed_rbac_roles",
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+
+			// Only seed if no roles exist yet
+			var count int64
+			tx.Model(&tables.TableRole{}).Count(&count)
+			if count > 0 {
+				return nil // Already seeded
+			}
+
+			now := time.Now()
+			resources := []string{
+				"ModelProvider", "VirtualKeys", "MCPGateway", "Plugins",
+				"Logs", "Observability", "Customers", "Teams", "RBAC",
+				"Governance", "RoutingRules", "Users", "UserProvisioning",
+				"AuditLogs", "Settings", "Cluster",
+				"GuardrailsConfig", "GuardrailsProviders", "GuardrailRules",
+				"PIIRedactor", "PromptRepository", "PromptDeploymentStrategy",
+			}
+			operations := []string{"View", "Create", "Update", "Delete", "Read", "Download"}
+
+			roles := []struct {
+				id, name, desc string
+				isDefault      bool
+				adminAll       bool
+			}{
+				{uuid.New().String(), "Admin", "Full access to all resources", true, true},
+				{uuid.New().String(), "Editor", "Can create and modify resources", false, false},
+				{uuid.New().String(), "Viewer", "Read-only access to resources", false, false},
+			}
+
+			for _, r := range roles {
+				role := tables.TableRole{
+					ID: r.id, Name: r.name, Description: r.desc,
+					IsDefault: r.isDefault, CreatedAt: now, UpdatedAt: now,
+				}
+				if err := tx.Create(&role).Error; err != nil {
+					return fmt.Errorf("failed to create role %s: %w", r.name, err)
+				}
+
+				for _, res := range resources {
+					for _, op := range operations {
+						allowed := r.adminAll
+						if !r.adminAll {
+							// Editor: View, Read, Create, Update allowed; Delete, Download denied
+							allowed = op == "View" || op == "Read" || op == "Create" || op == "Update"
+							// Viewer: only View and Read
+							if r.name == "Viewer" {
+								allowed = op == "View" || op == "Read"
+							}
+						}
+
+						perm := tables.TableRolePermission{
+							RoleID: r.id, Resource: res, Operation: op, Allowed: allowed,
+						}
+						if err := tx.Create(&perm).Error; err != nil {
+							return fmt.Errorf("failed to create permission %s/%s for %s: %w", res, op, r.name, err)
+						}
+					}
+				}
+			}
+
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			tx.Where("1=1").Delete(&tables.TableRolePermission{})
+			tx.Where("1=1").Delete(&tables.TableRole{})
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running seed_rbac_roles migration: %s", err.Error())
 	}
 	return nil
 }

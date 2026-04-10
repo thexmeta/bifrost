@@ -657,6 +657,11 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
+	// Persist to config.json for two-way sync
+	if err := h.store.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after config update: %v", err)
+	}
+
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	SendJSON(ctx, map[string]any{
 		"status":  "success",

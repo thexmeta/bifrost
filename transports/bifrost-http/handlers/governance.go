@@ -48,20 +48,25 @@ type GovernanceManager interface {
 // GovernanceHandler manages HTTP requests for governance operations
 type GovernanceHandler struct {
 	configStore       configstore.ConfigStore
+	configWriter      *lib.Config
 	governanceManager GovernanceManager
 }
 
 // NewGovernanceHandler creates a new governance handler instance
-func NewGovernanceHandler(manager GovernanceManager, configStore configstore.ConfigStore) (*GovernanceHandler, error) {
+func NewGovernanceHandler(manager GovernanceManager, configStore configstore.ConfigStore, config *lib.Config) (*GovernanceHandler, error) {
 	if manager == nil {
 		return nil, fmt.Errorf("governance manager is required")
 	}
 	if configStore == nil {
 		return nil, fmt.Errorf("config store is required")
 	}
+	if config == nil {
+		return nil, fmt.Errorf("config is required")
+	}
 	return &GovernanceHandler{
 		governanceManager: manager,
 		configStore:       configStore,
+		configWriter:      config,
 	}, nil
 }
 
@@ -676,6 +681,11 @@ func (h *GovernanceHandler) createVirtualKey(ctx *fasthttp.RequestCtx) {
 		"message":     "Virtual key created successfully",
 		"virtual_key": preloadedVk,
 	})
+
+	// Persist to config.json for two-way sync
+	if err := h.configWriter.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after VK create: %v", err)
+	}
 }
 
 // getVirtualKey handles GET /api/governance/virtual-keys/{vk_id} - Get a specific virtual key
@@ -1276,6 +1286,11 @@ func (h *GovernanceHandler) updateVirtualKey(ctx *fasthttp.RequestCtx) {
 		"message":     "Virtual key updated successfully",
 		"virtual_key": preloadedVk,
 	})
+
+	// Persist to config.json for two-way sync
+	if err := h.configWriter.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after VK update: %v", err)
+	}
 }
 
 // deleteVirtualKey handles DELETE /api/governance/virtual-keys/{vk_id} - Delete a virtual key
@@ -1310,6 +1325,11 @@ func (h *GovernanceHandler) deleteVirtualKey(ctx *fasthttp.RequestCtx) {
 	SendJSON(ctx, map[string]interface{}{
 		"message": "Virtual key deleted successfully",
 	})
+
+	// Persist to config.json for two-way sync
+	if err := h.configWriter.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after VK delete: %v", err)
+	}
 }
 
 // Team CRUD Operations
