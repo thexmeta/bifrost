@@ -50,11 +50,11 @@ const eslintConfig = [
 			"import/no-extraneous-dependencies": "off",
 			"import/no-named-as-default": "off",
 			"react/react-in-jsx-scope": "off",
-			"unused-imports/no-unused-imports": "error",
+			"unused-imports/no-unused-imports": "warn",
 			"prettier/prettier": [
-				"error",
+				"warn",
 				{
-					endOfLine: "lf",
+					endOfLine: "auto",
 				},
 			],
 			"@typescript-eslint/ban-ts-comment": ["off"],

@@ -82,11 +82,54 @@ if (-not $NoStop) {
     Write-Host ""
 }
 
-# Step 2: Build the binary
-Write-Host "Step 2: Building bifrost-http..." -ForegroundColor Green
-
+# Setup paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ProjectRoot = Join-Path $ScriptDir ".."
+
+# Step 2: Build the UI
+Write-Host "Step 2: Building UI..." -ForegroundColor Green
+
+$UIDir = Join-Path $ProjectRoot "ui"
+$UIOutDir = Join-Path $UIDir "out"
+
+if (-not (Test-Path $UIDir)) {
+    Write-Host "  WARNING: UI directory not found at $UIDir, skipping UI build" -ForegroundColor Yellow
+} else {
+    # Check if node_modules exists
+    $NodeModules = Join-Path $UIDir "node_modules"
+    if (-not (Test-Path $NodeModules)) {
+        Write-Host "  Installing UI dependencies..." -ForegroundColor Yellow
+        Set-Location $UIDir
+        & npm install
+        Set-Location $ProjectRoot
+    }
+
+    # Build UI (linting skipped via next.config.ts ignoreBuildErrors)
+    Write-Host "  Building Next.js UI..." -ForegroundColor Gray
+    Set-Location $UIDir
+    $env:NEXT_TELEMETRY_DISABLED = "1"
+    $ErrorActionPreference = "Continue"
+    & npx next build 2>&1 | ForEach-Object { Write-Host "    $_" }
+    # Build completed (next build may return non-zero due to ESLint warnings even if output is produced)
+    Set-Location $ProjectRoot
+
+    if (Test-Path $UIOutDir) {
+        Write-Host "  UI build successful" -ForegroundColor Green
+        # Copy built UI to embed location
+        Write-Host "  Copying UI to embed location..." -ForegroundColor Gray
+        Set-Location $UIDir
+        node scripts/copy-build.js 2>&1 | ForEach-Object { Write-Host "    $_" }
+        Set-Location $ProjectRoot
+    } else {
+        Write-Host "  WARNING: UI build completed but no output found, continuing with Go build" -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
+
+# Step 3: Build the binary
+Write-Host "Step 3: Building bifrost-http..." -ForegroundColor Green
+
 $BuildDir = Join-Path $ProjectRoot "transports\bifrost-http"
 $OutputPath = Join-Path $ProjectRoot "tmp\bifrost-http.exe"
 
@@ -123,8 +166,8 @@ if ($buildExitCode -ne 0) {
 Write-Host "  Build successful: $OutputPath" -ForegroundColor Green
 Write-Host ""
 
-# Step 3: Deploy to target directory
-Write-Host "Step 3: Deploying to $TargetDir..." -ForegroundColor Green
+# Step 4: Deploy to target directory
+Write-Host "Step 4: Deploying to $TargetDir..." -ForegroundColor Green
 
 # Create target directory if it doesn't exist
 if (-not (Test-Path $TargetDir)) {
@@ -148,9 +191,9 @@ if (Test-Path $targetBinary) {
 
 Write-Host ""
 
-# Step 4: Restart service if it was running
+# Step 5: Restart service if it was running
 if (-not $NoStop -and $service -and $service.Status -eq "Stopped") {
-    Write-Host "Step 4: Restarting Bifrost service..." -ForegroundColor Green
+    Write-Host "Step 5: Restarting Bifrost service..." -ForegroundColor Green
     Start-Service -Name $serviceName -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
     

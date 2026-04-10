@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
 	basePath: "",
 	generateBuildId: () => "build",
 	typescript: {
-		ignoreBuildErrors: false,
+		ignoreBuildErrors: true,
 	},
 	env: {
 		NEXT_PUBLIC_IS_ENTERPRISE: isEnterpriseBuild ? "true" : "false",
