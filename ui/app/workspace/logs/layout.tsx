@@ -1,17 +1,16 @@
-import { NoPermissionView } from "@/components/noPermissionView";
-import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
-import LogsPage from "./page";
+"use client"
 
-function RouteComponent() {
-	const hasViewLogsAccess = useRbac(RbacResource.Logs, RbacOperation.View);
-	const childMatches = useChildMatches();
-	if (!hasViewLogsAccess) {
-		return <NoPermissionView entity="logs" />;
-	}
-	return <div className="flex h-full flex-col">{childMatches.length === 0 ? <LogsPage /> : <Outlet />}</div>;
+import { NoPermissionView } from "@/components/noPermissionView"
+import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib"
+
+export default function LogsLayout({ children }: { children: React.ReactNode }) {
+  const hasViewLogsAccess = useRbac(RbacResource.Logs, RbacOperation.View)
+  if (!hasViewLogsAccess) {
+    return <NoPermissionView entity="logs" />
+  }
+  return (
+    <div className="flex flex-col h-full">
+      {children}
+    </div>
+  )
 }
-
-export const Route = createFileRoute("/workspace/logs")({
-	component: RouteComponent,
-});

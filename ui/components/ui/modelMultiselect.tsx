@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/components/ui/utils";
 import { useLazyGetBaseModelsQuery, useLazyGetModelsQuery } from "@/lib/store/apis/providersApi";
 import { X } from "lucide-react";
@@ -9,7 +11,6 @@ import { Option } from "./multiselectUtils";
 interface ModelMultiselectPropsBase {
 	provider?: string;
 	keys?: string[];
-	vks?: string[];
 	placeholder?: string;
 	disabled?: boolean;
 	className?: string;
@@ -18,18 +19,10 @@ interface ModelMultiselectPropsBase {
 	 * - `"base_models"`: loads distinct base model names (useful for governance where cross-provider matching is needed)
 	 */
 	loadModelsOnEmptyProvider?: boolean | "base_models";
-	/** Prepends an "Allow All Models" option (value: "*") to the dropdown */
-	allowAllOption?: boolean;
 	/** id for the search input (accessibility) */
 	inputId?: string;
 	/** id of element that labels this control (accessibility) */
 	ariaLabelledBy?: string;
-	/** test selector for the container element */
-	"data-testid"?: string;
-	/** Menu position strategy. Use "absolute" inside popovers to avoid portal issues. Defaults to "fixed". */
-	menuPosition?: "absolute" | "fixed";
-	/** Target element for the menu portal. */
-	menuPortalTarget?: HTMLElement | null;
 }
 
 interface ModelMultiselectPropsSingle extends ModelMultiselectPropsBase {
@@ -56,13 +49,10 @@ interface ModelOption {
 	provider?: string;
 }
 
-const ALL_MODELS_OPTION: ModelOption = { label: "All Models", value: "*" };
-
 export function ModelMultiselect(props: ModelMultiselectProps) {
 	const {
 		provider,
 		keys,
-		vks,
 		value,
 		unfiltered = false,
 		onChange,
@@ -70,7 +60,6 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 		disabled = false,
 		className,
 		loadModelsOnEmptyProvider = false,
-		allowAllOption = false,
 	} = props;
 	const isSingleSelect = props.isSingleSelect === true;
 
@@ -90,15 +79,17 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 		? stringValue
 			? [{ label: stringValue, value: stringValue }]
 			: []
-		: arrayValue.map((model) => (model === "*" ? ALL_MODELS_OPTION : { label: model, value: model }));
+		: arrayValue.map((model) => ({
+			label: model,
+			value: model,
+		}));
 
-	// Fetch initial models on mount or when provider/keys/vks change
+	// Fetch initial models on mount or when provider/keys change
 	useEffect(() => {
 		if (provider) {
 			getModels({
 				provider,
 				keys: keys && keys.length > 0 ? keys : undefined,
-				vks: vks && vks.length > 0 ? vks : undefined,
 				limit: 5,
 				unfiltered,
 			});
@@ -107,21 +98,17 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 		} else if (shouldLoadOnEmpty) {
 			getModels({
 				keys: keys && keys.length > 0 ? keys : undefined,
-				vks: vks && vks.length > 0 ? vks : undefined,
 				limit: 20,
 				unfiltered,
 			});
 		}
-	}, [provider, keys, vks, getModels, getBaseModels, shouldLoadOnEmpty, shouldUseBaseModels]);
+	}, [provider, keys, getModels, getBaseModels, shouldLoadOnEmpty, shouldUseBaseModels]);
 
 	// Load options function for AsyncMultiSelect
 	const loadOptions = useCallback(
 		(query: string, callback: (options: ModelOption[]) => void) => {
-			// Prepend "Allow All Models" when allowAllOption is enabled and query matches (or is empty)
-			const prefix: ModelOption[] = allowAllOption && (!query || "all models".includes(query.toLowerCase())) ? [ALL_MODELS_OPTION] : [];
-
 			if (!provider && !shouldLoadOnEmpty) {
-				callback(prefix);
+				callback([]);
 				return;
 			}
 
@@ -136,17 +123,16 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 							label: model,
 							value: model,
 						}));
-						callback([...prefix, ...options]);
+						callback(options);
 					})
 					.catch(() => {
-						callback(prefix);
+						callback([]);
 					});
 			} else {
 				getModels({
 					query: query || undefined,
 					provider: provider || undefined,
 					keys: keys && keys.length > 0 ? keys : undefined,
-					vks: vks && vks.length > 0 ? vks : undefined,
 					limit: query ? 50 : shouldLoadOnEmpty && !provider ? 20 : 5,
 					unfiltered,
 				})
@@ -157,14 +143,14 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 							value: model.name,
 							provider: model.provider,
 						}));
-						callback([...prefix, ...options]);
+						callback(options);
 					})
 					.catch(() => {
-						callback(prefix);
+						callback([]);
 					});
 			}
 		},
-		[getModels, getBaseModels, provider, keys, vks, shouldLoadOnEmpty, shouldUseBaseModels, allowAllOption],
+		[getModels, getBaseModels, provider, keys, shouldLoadOnEmpty, shouldUseBaseModels],
 	);
 
 	// Handle selection change
@@ -185,7 +171,6 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 					query: currentQuery || undefined,
 					provider,
 					keys: keys && keys.length > 0 ? keys : undefined,
-					vks: vks && vks.length > 0 ? vks : undefined,
 					limit: currentQuery ? 20 : 5,
 					unfiltered,
 				});
@@ -198,50 +183,39 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 				getModels({
 					query: currentQuery || undefined,
 					keys: keys && keys.length > 0 ? keys : undefined,
-					vks: vks && vks.length > 0 ? vks : undefined,
 					limit: currentQuery ? 20 : 5,
 					unfiltered,
 				});
 			}
 		},
-		[onChange, provider, keys, vks, getModels, getBaseModels, isSingleSelect, shouldLoadOnEmpty, shouldUseBaseModels],
+		[onChange, provider, keys, getModels, getBaseModels, isSingleSelect, shouldLoadOnEmpty, shouldUseBaseModels],
 	);
 
 	// Handle input change - track in both state and ref
 	// Per react-select docs: ignore input clear on blur, menu close, and set-value (selection)
-	const handleInputChange = useCallback(
-		(newValue: string, actionMeta: { action: string }) => {
-			// Don't clear input on blur or menu close (preserves search while browsing)
-			if (!isSingleSelect && (actionMeta.action === "input-blur" || actionMeta.action === "menu-close")) {
-				return;
-			}
-			setInputValue(newValue);
-			inputValueRef.current = newValue;
-		},
-		[isSingleSelect],
-	);
+	const handleInputChange = useCallback((newValue: string, actionMeta: { action: string }) => {
+		// Don't clear input on blur or menu close (preserves search while browsing)
+		if (!isSingleSelect && (actionMeta.action === "input-blur" || actionMeta.action === "menu-close")) {
+			return;
+		}
+		setInputValue(newValue);
+		inputValueRef.current = newValue;
+	}, []);
 
 	// Convert API data to options for default display
 	const defaultOptions: ModelOption[] = useMemo(() => {
-		const prefix = allowAllOption ? [ALL_MODELS_OPTION] : [];
 		if (shouldUseBaseModels) {
-			return [
-				...prefix,
-				...(baseModelsData?.models?.map((model) => ({
-					label: model,
-					value: model,
-				})) || []),
-			];
+			return baseModelsData?.models?.map((model) => ({
+				label: model,
+				value: model,
+			})) || [];
 		}
-		return [
-			...prefix,
-			...(modelsData?.models?.map((model) => ({
-				label: model.name,
-				value: model.name,
-				provider: model.provider,
-			})) || []),
-		];
-	}, [modelsData, baseModelsData, shouldUseBaseModels, allowAllOption]);
+		return modelsData?.models?.map((model) => ({
+			label: model.name,
+			value: model.name,
+			provider: model.provider,
+		})) || [];
+	}, [modelsData, baseModelsData, shouldUseBaseModels]);
 
 	const shouldBeDisabled = disabled || (!provider && !shouldLoadOnEmpty);
 
@@ -251,7 +225,6 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 			hideSelectedOptions
 			inputId={props.inputId}
 			ariaLabelledBy={props.ariaLabelledBy}
-			data-testid={props["data-testid"]}
 			value={selectedOptions}
 			onChange={handleChange}
 			reload={loadOptions}
@@ -259,7 +232,7 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 			isCreatable={true}
 			dynamicOptionCreation={true}
 			createOptionText={"Press enter to add new model"}
-			defaultOptions={defaultOptions.length > 0 ? defaultOptions : ([] as Option<ModelOption>[])}
+			defaultOptions={defaultOptions.length > 0 ? defaultOptions : [] as Option<ModelOption>[]}
 			isLoading={shouldUseBaseModels ? isLoadingBaseModels : isLoading}
 			placeholder={placeholder}
 			disabled={shouldBeDisabled}
@@ -269,8 +242,6 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 			isClearable={false}
 			closeMenuOnSelect={isSingleSelect}
 			menuPlacement="auto"
-			menuPosition={props.menuPosition}
-			menuPortalTarget={props.menuPortalTarget}
 			menuListClassName="mx-1"
 			inputValue={inputValue}
 			onInputChange={handleInputChange}
@@ -278,30 +249,26 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 			emptyResultPlaceholder={provider || shouldLoadOnEmpty ? "Start typing to search models..." : "Please select a provider first"}
 			views={{
 				dropdownIndicator: isSingleSelect ? undefined : () => <></>,
-				singleValue: isSingleSelect
-					? (singleValueProps: SingleValueProps<ModelOption>) => (
-							<span className="absolute left-1.5 text-sm">{singleValueProps.data.label}</span>
-						)
-					: undefined,
-				multiValue: isSingleSelect
-					? undefined
-					: (multiValueProps: MultiValueProps<ModelOption>) => {
-							return (
-								<div
-									{...multiValueProps.innerProps}
-									className="bg-accent dark:!bg-card flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 text-sm"
-								>
-									{multiValueProps.data.label}{" "}
-									<X
-										className="hover:text-foreground text-muted-foreground h-4 w-4 cursor-pointer"
-										onClick={(e) => {
-											e.stopPropagation();
-											multiValueProps.removeProps.onClick?.(e as any);
-										}}
-									/>
-								</div>
-							);
-						},
+				singleValue: isSingleSelect ? (singleValueProps: SingleValueProps<ModelOption>) => (
+					<span className="absolute left-1.5 text-sm">{singleValueProps.data.label}</span>
+				) : undefined,
+				multiValue: isSingleSelect ? undefined : (multiValueProps: MultiValueProps<ModelOption>) => {
+					return (
+						<div
+							{...multiValueProps.innerProps}
+							className="bg-accent dark:!bg-card flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 text-sm"
+						>
+							{multiValueProps.data.label}{" "}
+							<X
+								className="hover:text-foreground text-muted-foreground h-4 w-4 cursor-pointer"
+								onClick={(e) => {
+									e.stopPropagation();
+									multiValueProps.removeProps.onClick?.(e as any);
+								}}
+							/>
+						</div>
+					);
+				},
 				option: (optionProps: OptionProps<ModelOption>) => {
 					const { Option } = components;
 					return (

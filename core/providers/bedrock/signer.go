@@ -280,16 +280,17 @@ func signAWSRequestFastHTTP(
 	accessKey, secretKey string,
 	sessionToken *string,
 	region, service string,
+	providerName schemas.ModelProvider,
 ) *schemas.BifrostError {
 	// Get AWS credentials if not provided
 	if accessKey == "" && secretKey == "" {
 		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 		if err != nil {
-			return providerUtils.NewBifrostOperationError("failed to load aws config", err)
+			return providerUtils.NewBifrostOperationError("failed to load aws config", err, providerName)
 		}
 		creds, err := cfg.Credentials.Retrieve(ctx)
 		if err != nil {
-			return providerUtils.NewBifrostOperationError("failed to retrieve aws credentials", err)
+			return providerUtils.NewBifrostOperationError("failed to retrieve aws credentials", err, providerName)
 		}
 		accessKey = creds.AccessKeyID
 		secretKey = creds.SecretAccessKey

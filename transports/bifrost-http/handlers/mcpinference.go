@@ -14,14 +14,14 @@ import (
 
 type MCPInferenceHandler struct {
 	client *bifrost.Bifrost
-	config *lib.Config
+	store  *lib.Config
 }
 
 // NewMCPInferenceHandler creates a new MCP inference handler instance
-func NewMCPInferenceHandler(client *bifrost.Bifrost, config *lib.Config) *MCPInferenceHandler {
+func NewMCPInferenceHandler(client *bifrost.Bifrost, store *lib.Config) *MCPInferenceHandler {
 	return &MCPInferenceHandler{
 		client: client,
-		config: config,
+		store:  store,
 	}
 }
 
@@ -60,7 +60,7 @@ func (h *MCPInferenceHandler) executeChatMCPTool(ctx *fasthttp.RequestCtx) {
 	}
 
 	// Convert context
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, false, h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, false, h.store.GetHeaderMatcher())
 	defer cancel() // Ensure cleanup on function exit
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
@@ -93,7 +93,7 @@ func (h *MCPInferenceHandler) executeResponsesMCPTool(ctx *fasthttp.RequestCtx) 
 	}
 
 	// Convert context
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, false, h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, false, h.store.GetHeaderMatcher())
 	defer cancel() // Ensure cleanup on function exit
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")

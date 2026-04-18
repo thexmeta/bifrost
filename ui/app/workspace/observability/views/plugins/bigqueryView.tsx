@@ -1,3 +1,5 @@
+"use client";
+
 import BigQueryConnectorView from "@enterprise/components/data-connectors/bigquery/bigqueryConnectorView";
 
 export default function BigQueryView() {

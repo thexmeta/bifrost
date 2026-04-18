@@ -74,7 +74,6 @@ export const RequestTypes = [
 	// WebSocket/Realtime operations
 	"websocket_responses",
 	"realtime",
-	"realtime.turn",
 ] as const;
 
 export const ProviderLabels: Record<ProviderName, string> = {
@@ -203,7 +202,6 @@ export const RequestTypeLabels = {
 	// WebSocket operations
 	websocket_responses: "WebSocket Responses",
 	realtime: "Realtime",
-	"realtime.turn": "Realtime Turn",
 } as const;
 
 export const RequestTypeColors = {
@@ -284,7 +282,6 @@ export const RequestTypeColors = {
 	// WebSocket operations
 	websocket_responses: "bg-teal-100 text-teal-800",
 	realtime: "bg-indigo-100 text-indigo-800",
-	"realtime.turn": "bg-cyan-100 text-cyan-800",
 } as const;
 
 export const RoutingEngineUsedLabels = {

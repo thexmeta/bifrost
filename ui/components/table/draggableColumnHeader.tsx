@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -38,11 +40,10 @@ export function DraggableColumnHeader<TData>({
 	const [isDropTarget, setIsDropTarget] = useState(false);
 	const pinned = header.column.getIsPinned();
 
-	const size = header.getSize();
 	return (
 		<th
 			ref={cellRef}
-			style={{ width: size, minWidth: size, maxWidth: size, ...pinStyle }}
+			style={pinStyle}
 			className={cn(
 				TH_CLASS,
 				pinned && (pinnedHeaderClassName ?? "bg-card"),
@@ -76,7 +77,9 @@ export function DraggableColumnHeader<TData>({
 		>
 			{header.isPlaceholder ? null : (
 				<div className="group/col flex items-center">
-					<div className="flex-1">{flexRender(header.column.columnDef.header, header.getContext())}</div>
+					<div className="flex-1">
+						{flexRender(header.column.columnDef.header, header.getContext())}
+					</div>
 					{isConfigurable && (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>

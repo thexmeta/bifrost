@@ -195,23 +195,27 @@ func TestBedrockRerankRequestToBifrostRerankRequestNil(t *testing.T) {
 
 func TestResolveBedrockDeployment(t *testing.T) {
 	key := schemas.Key{
-		Aliases: schemas.KeyAliases{
-			"cohere-rerank": "arn:aws:bedrock:us-east-1::foundation-model/cohere.rerank-v3-5:0",
+		BedrockKeyConfig: &schemas.BedrockKeyConfig{
+			Deployments: map[string]string{
+				"cohere-rerank": "arn:aws:bedrock:us-east-1::foundation-model/cohere.rerank-v3-5:0",
+			},
 		},
 	}
 
-	deployment := key.Aliases.Resolve("cohere-rerank")
+	deployment := resolveBedrockDeployment("cohere-rerank", key)
 	assert.Equal(t, "arn:aws:bedrock:us-east-1::foundation-model/cohere.rerank-v3-5:0", deployment)
-	assert.Equal(t, "cohere.rerank-v3-5:0", key.Aliases.Resolve("cohere.rerank-v3-5:0"))
-	assert.Equal(t, "", key.Aliases.Resolve(""))
+	assert.Equal(t, "cohere.rerank-v3-5:0", resolveBedrockDeployment("cohere.rerank-v3-5:0", key))
+	assert.Equal(t, "", resolveBedrockDeployment("", key))
 }
 
 func TestBedrockRerankRequiresARNModelIdentifier(t *testing.T) {
 	provider := &BedrockProvider{}
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	key := schemas.Key{
-		Aliases: schemas.KeyAliases{
-			"cohere-rerank": "cohere.rerank-v3-5:0",
+		BedrockKeyConfig: &schemas.BedrockKeyConfig{
+			Deployments: map[string]string{
+				"cohere-rerank": "cohere.rerank-v3-5:0",
+			},
 		},
 	}
 

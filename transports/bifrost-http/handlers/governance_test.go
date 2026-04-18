@@ -272,7 +272,7 @@ func TestCollectProviderConfigDeleteIDs(t *testing.T) {
 		{
 			name: "collects both IDs",
 			config: configstoreTables.TableVirtualKeyProviderConfig{
-				Budgets:     []configstoreTables.TableBudget{{ID: budgetID}},
+				BudgetID:    &budgetID,
 				RateLimitID: &rateLimitID,
 			},
 			wantBudgetIDs: []string{budgetID},
@@ -281,7 +281,7 @@ func TestCollectProviderConfigDeleteIDs(t *testing.T) {
 		{
 			name: "appends to existing slices",
 			config: configstoreTables.TableVirtualKeyProviderConfig{
-				Budgets:     []configstoreTables.TableBudget{{ID: budgetID}},
+				BudgetID:    &budgetID,
 				RateLimitID: &rateLimitID,
 			},
 			initialBudgetIDs: []string{"budget-0"},

@@ -1,6 +1,9 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { DefaultPerformanceConfig } from "@/lib/constants/config";
 import { getErrorMessage, setProviderFormDirtyState, useAppDispatch } from "@/lib/store";
 import { useUpdateProviderMutation } from "@/lib/store/apis/providersApi";
@@ -11,7 +14,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
-import { buildProviderUpdatePayload } from "../views/utils";
 
 interface PerformanceFormFragmentProps {
 	provider: ModelProvider;
@@ -49,12 +51,13 @@ export function PerformanceFormFragment({ provider }: PerformanceFormFragmentPro
 
 	const onSubmit = (data: PerformanceFormSchema) => {
 		// Create updated provider configuration (raw request/response are in Debugging tab)
-		const updatedProvider = buildProviderUpdatePayload(provider, {
+		const updatedProvider: ModelProvider = {
+			...provider,
 			concurrency_and_buffer_size: {
 				concurrency: data.concurrency_and_buffer_size.concurrency,
 				buffer_size: data.concurrency_and_buffer_size.buffer_size,
 			},
-		});
+		};
 		updateProvider(updatedProvider)
 			.unwrap()
 			.then(() => {
@@ -86,17 +89,17 @@ export function PerformanceFormFragment({ provider }: PerformanceFormFragmentPro
 												type="number"
 												placeholder="10"
 												{...field}
-												value={field.value === undefined || Number.isNaN(field.value) ? "" : field.value}
+												value={field.value === undefined || Number.isNaN(field.value) ? '' : field.value}
 												disabled={!hasUpdateProviderAccess}
 												onChange={(e) => {
-													const value = e.target.value;
-													if (value === "") {
-														field.onChange(undefined);
-														return;
+													const value = e.target.value
+													if (value === '') {
+														field.onChange(undefined)
+														return
 													}
-													const parsed = Number.parseInt(value);
+													const parsed = Number.parseInt(value)
 													if (!Number.isNaN(parsed)) {
-														field.onChange(parsed);
+														field.onChange(parsed)
 													}
 													form.trigger("concurrency_and_buffer_size");
 												}}
@@ -119,17 +122,17 @@ export function PerformanceFormFragment({ provider }: PerformanceFormFragmentPro
 												type="number"
 												placeholder="10"
 												{...field}
-												value={field.value === undefined || Number.isNaN(field.value) ? "" : field.value}
+												value={field.value === undefined || Number.isNaN(field.value) ? '' : field.value}
 												disabled={!hasUpdateProviderAccess}
 												onChange={(e) => {
-													const value = e.target.value;
-													if (value === "") {
-														field.onChange(undefined);
-														return;
+													const value = e.target.value
+													if (value === '') {
+														field.onChange(undefined)
+														return
 													}
-													const parsed = Number.parseInt(value);
+													const parsed = Number.parseInt(value)
 													if (!Number.isNaN(parsed)) {
-														field.onChange(parsed);
+														field.onChange(parsed)
 													}
 													form.trigger("concurrency_and_buffer_size");
 												}}

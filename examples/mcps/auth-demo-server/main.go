@@ -7,11 +7,8 @@ package main
 //     tools/call). A missing or wrong key is rejected before the MCP server
 //     sees the message at all.
 //
-//  2. TOOL-EXECUTION AUTH (X-Tool-Token header)
-//     A separate secret token checked exclusively inside sensitive tool handlers
-//     at call time. Public tools ignore it; the connection middleware does not
-//     inspect it at all. This lets you scope a second credential to tool
-//     execution only — distinct from the connection credential.
+//  2. TOOL-LEVEL AUTH (X-Role header)
+//     Enforced inside individual sensitive tool handlers. Public tools ignore it.
 //
 // HOW BIFROST SENDS HEADERS
 //
@@ -25,8 +22,7 @@ package main
 // This means all configured headers are present on EVERY request — there is no
 // separate "connection-only" vs "tool-only" header mechanism in Bifrost. To
 // distinguish the two auth levels you simply use different header names, both
-// configured in the same `headers` map. The server then enforces each header
-// at the appropriate layer (middleware vs. handler).
+// configured in the same `headers` map.
 //
 // Bifrost config example:
 //
@@ -36,8 +32,8 @@ package main
 //	  "connection_string": "http://localhost:3002/",
 //	  "auth_type": "headers",
 //	  "headers": {
-//	    "X-API-Key":    "super-secret-key",
-//	    "X-Tool-Token": "tool-exec-secret"
+//	    "X-API-Key": "super-secret-key",
+//	    "X-Role":    "admin"
 //	  },
 //	  "tools_to_execute": ["*"]
 //	}
@@ -54,16 +50,14 @@ import (
 )
 
 const (
-	// connectionAPIKey is checked in HTTP middleware on every request
-	// (initialize, tools/list, tools/call).
+	// connectionAPIKey is checked in HTTP middleware on every request.
 	// In production, load this from an environment variable or secrets manager.
 	connectionAPIKey = "super-secret-key"
 
-	// toolExecToken is checked exclusively inside sensitive tool handlers —
-	// never in the connection middleware. It acts as a second independent
-	// credential that gates tool execution only.
-	// In production, load this from an environment variable or secrets manager.
-	toolExecToken = "tool-exec-secret"
+	// requiredRole is checked inside the sensitive tool handler only.
+	// Both X-API-Key and X-Role are configured together in Bifrost's `headers`
+	// map and are forwarded on every HTTP request (connection and tool calls).
+	requiredRole = "admin"
 )
 
 // contextKey is a private type so we don't collide with other packages' context keys.
@@ -75,7 +69,7 @@ func main() {
 	s := server.NewMCPServer("auth-demo-server", "1.0.0")
 
 	// public_info only requires connection-level auth (X-API-Key).
-	// Any authenticated client can call it without a tool execution token.
+	// Any authenticated client can call it regardless of role.
 	publicTool := mcp.NewTool(
 		"public_info",
 		mcp.WithDescription("Returns non-sensitive public information. Requires connection auth (X-API-Key) only."),
@@ -83,14 +77,13 @@ func main() {
 	)
 	s.AddTool(publicTool, publicInfoHandler)
 
-	// secret_data requires BOTH connection-level auth (X-API-Key) AND a
-	// dedicated tool-execution token (X-Tool-Token) checked inside the handler.
+	// secret_data requires BOTH connection-level auth (X-API-Key) AND
+	// a role check (X-Role: admin) inside the handler.
 	// In Bifrost both headers live in the same `headers` map and arrive on
-	// every request, so the handler reads X-Tool-Token from context and
-	// validates it independently of the connection credential.
+	// every request, so the handler just reads X-Role from the context.
 	secretTool := mcp.NewTool(
 		"secret_data",
-		mcp.WithDescription("Returns sensitive data. Requires connection auth (X-API-Key) AND tool-execution auth (X-Tool-Token)."),
+		mcp.WithDescription("Returns sensitive data. Requires connection auth (X-API-Key) AND role check (X-Role: admin)."),
 		mcp.WithString("resource", mcp.Required(), mcp.Description("Resource name to fetch")),
 	)
 	s.AddTool(secretTool, secretDataHandler)
@@ -107,11 +100,10 @@ func main() {
 	addr := "localhost:3002"
 	log.Printf("auth-demo-server listening on http://%s/", addr)
 	log.Printf("\nAuth layers:")
-	log.Printf("  Connection-level:   X-API-Key: %s  (middleware rejects all requests without it)", connectionAPIKey)
-	log.Printf("  Tool-execution:     X-Tool-Token: %s  (only secret_data checks this, validated inside the handler)", toolExecToken)
+	log.Printf("  Connection-level: X-API-Key: %s  (middleware rejects all requests without it)", connectionAPIKey)
+	log.Printf("  Tool-level:       X-Role: %s  (only secret_data checks this, read from context)", requiredRole)
 	log.Printf("\nNote: Bifrost sends all `headers` on both connection setup AND every tool call.")
-	log.Printf("Both X-API-Key and X-Tool-Token go in the same `headers` map.")
-	log.Printf("The server enforces each at the right layer: middleware vs. handler.\n")
+	log.Printf("Both X-API-Key and X-Role go in the same `headers` map.\n")
 	log.Printf("Bifrost config:")
 	log.Printf(`
 {
@@ -120,12 +112,12 @@ func main() {
   "connection_string": "http://%s/",
   "auth_type": "headers",
   "headers": {
-    "X-API-Key":    "%s",
-    "X-Tool-Token": "%s"
+    "X-API-Key": "%s",
+    "X-Role":    "%s"
   },
   "tools_to_execute": ["*"]
 }
-`, addr, connectionAPIKey, toolExecToken)
+`, addr, connectionAPIKey, requiredRole)
 
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("Server error: %v", err)
@@ -182,22 +174,21 @@ func publicInfoHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 }
 
 // secretDataHandler handles "secret_data". Connection-level auth (X-API-Key)
-// has already been verified by middleware. Here we additionally check
-// X-Tool-Token — a separate secret dedicated to authorizing tool execution.
-// Bifrost sends it as part of the same `headers` map, so it arrives on every
-// request including this tool call; the middleware intentionally ignores it.
+// has already been verified by middleware. Here we additionally check X-Role,
+// which Bifrost sends as part of the same `headers` map — so it is present on
+// every request, including this tool call.
 func secretDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// ── Tool-execution token check ───────────────────────────────────────────
+	// ── Tool-level role check ────────────────────────────────────────────────
 	headers, ok := ctx.Value(requestHeadersKey).(http.Header)
 	if !ok {
 		return mcp.NewToolResultError("tool auth error: request headers unavailable in context"), nil
 	}
-	token := headers.Get("X-Tool-Token")
-	if token == "" {
-		return mcp.NewToolResultError("tool auth required: missing X-Tool-Token header"), nil
+	role := headers.Get("X-Role")
+	if role == "" {
+		return mcp.NewToolResultError("tool auth required: missing X-Role header"), nil
 	}
-	if token != toolExecToken {
-		return mcp.NewToolResultError("tool auth failed: invalid X-Tool-Token"), nil
+	if role != requiredRole {
+		return mcp.NewToolResultError(fmt.Sprintf("tool auth failed: role %q is not authorized for this tool", role)), nil
 	}
 	// ── Auth passed, proceed ─────────────────────────────────────────────────
 
@@ -209,7 +200,7 @@ func secretDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf(
-		"Secret data for resource %q: [classified content — X-API-Key + X-Tool-Token verified]", args.Resource,
+		"Secret data for resource %q: [classified content — X-API-Key + X-Role:%s verified]", args.Resource, role,
 	)), nil
 }
 

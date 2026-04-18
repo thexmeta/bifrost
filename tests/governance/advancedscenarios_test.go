@@ -976,10 +976,8 @@ func TestProviderConfigBudgetUpdateAfterExhaustion(t *testing.T) {
 			Name: vkName,
 			ProviderConfigs: []ProviderConfigRequest{
 				{
-					Provider:      "openai",
-					Weight:        float64Ptr(1.0),
-					AllowedModels: []string{"*"},
-					KeyIDs:        []string{"*"},
+					Provider: "openai",
+					Weight:   1.0,
 					Budget: &BudgetRequest{
 						MaxLimit:      initialBudget,
 						ResetDuration: "1h",
@@ -1065,11 +1063,9 @@ func TestProviderConfigBudgetUpdateAfterExhaustion(t *testing.T) {
 		Body: UpdateVirtualKeyRequest{
 			ProviderConfigs: []ProviderConfigRequest{
 				{
-					ID:            &providerConfigID,
-					Provider:      "openai",
-					Weight:        float64Ptr(1.0),
-					AllowedModels: []string{"*"},
-					KeyIDs:        []string{"*"},
+					ID:       &providerConfigID,
+					Provider: "openai",
+					Weight:   1.0,
 					Budget: &BudgetRequest{
 						MaxLimit:      newBudget,
 						ResetDuration: "1h",
@@ -1136,10 +1132,8 @@ func TestVKDeletionCascadeComplete(t *testing.T) {
 			},
 			ProviderConfigs: []ProviderConfigRequest{
 				{
-					Provider:      "openai",
-					Weight:        float64Ptr(1.0),
-					AllowedModels: []string{"*"},
-					KeyIDs:        []string{"*"},
+					Provider: "openai",
+					Weight:   1.0,
 					Budget: &BudgetRequest{
 						MaxLimit:      5.0,
 						ResetDuration: "1h",

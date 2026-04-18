@@ -1,9 +1,11 @@
-import UsersView from "@enterprise/components/user-groups/usersView";
+"use client"
+
+import UsersView from "@enterprise/components/user-groups/usersView"
 
 export default function GovernanceUsersPage() {
-	return (
-		<div className="mx-auto w-full max-w-7xl">
-			<UsersView />
-		</div>
-	);
+  return (
+    <div className="mx-auto w-full max-w-7xl">
+      <UsersView />
+    </div>
+  )
 }

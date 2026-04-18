@@ -3,13 +3,7 @@
  * Handles all API communication for routing rules CRUD operations
  */
 
-import {
-	RoutingRule,
-	GetRoutingRulesResponse,
-	GetRoutingRulesParams,
-	CreateRoutingRuleRequest,
-	UpdateRoutingRuleRequest,
-} from "@/lib/types/routingRules";
+import { RoutingRule, GetRoutingRulesResponse, GetRoutingRulesParams, CreateRoutingRuleRequest, UpdateRoutingRuleRequest } from "@/lib/types/routingRules";
 import { baseApi } from "./baseApi";
 
 export const routingRulesApi = baseApi.injectEndpoints({
@@ -62,7 +56,9 @@ export const routingRulesApi = baseApi.injectEndpoints({
 							}),
 						);
 					}
-					dispatch(routingRulesApi.util.updateQueryData("getRoutingRule", newRule.id, () => newRule));
+					dispatch(
+						routingRulesApi.util.updateQueryData("getRoutingRule", newRule.id, () => newRule)
+					);
 				} catch {}
 			},
 		}),
@@ -91,7 +87,9 @@ export const routingRulesApi = baseApi.injectEndpoints({
 							}),
 						);
 					}
-					dispatch(routingRulesApi.util.updateQueryData("getRoutingRule", updatedRule.id, () => updatedRule));
+					dispatch(
+						routingRulesApi.util.updateQueryData("getRoutingRule", updatedRule.id, () => updatedRule)
+					);
 				} catch {}
 			},
 		}),

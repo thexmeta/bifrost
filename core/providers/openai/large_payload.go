@@ -42,6 +42,8 @@ func handleOpenAILargePayloadPassthrough(
 	key schemas.Key,
 	extraHeaders map[string]string,
 	providerName schemas.ModelProvider,
+	model string,
+	requestType schemas.RequestType,
 	logger schemas.Logger,
 ) (*largePayloadResult, *schemas.BifrostError, bool) {
 	isLargePayload, _ := ctx.Value(schemas.BifrostContextKeyLargePayloadMode).(bool)
@@ -89,7 +91,7 @@ func handleOpenAILargePayloadPassthrough(
 	// Error responses are always small — materialize stream body for error parsing
 	if resp.StatusCode() != fasthttp.StatusOK {
 		providerUtils.MaterializeStreamErrorBody(ctx, resp)
-		parsedErr := ParseOpenAIError(resp)
+		parsedErr := ParseOpenAIError(resp, requestType, providerName, model)
 		fasthttp.ReleaseResponse(resp)
 		return nil, parsedErr, true
 	}
@@ -124,7 +126,7 @@ func finalizeOpenAIResponse(
 	providerName schemas.ModelProvider,
 	logger schemas.Logger,
 ) ([]byte, *largePayloadResult, *schemas.BifrostError) {
-	body, isLarge, bifrostErr := providerUtils.FinalizeResponseWithLargeDetection(ctx, resp, logger)
+	body, isLarge, bifrostErr := providerUtils.FinalizeResponseWithLargeDetection(ctx, resp, providerName, logger)
 	if bifrostErr != nil {
 		fasthttp.ReleaseResponse(resp)
 		return nil, nil, bifrostErr

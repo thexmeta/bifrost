@@ -1,3 +1,5 @@
+"use client";
+
 import type { ProviderLatencyHistogramResponse } from "@/lib/types/logs";
 import { useMemo } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -41,7 +43,7 @@ function AllProvidersTooltip({ active, payload, providers }: any) {
 	);
 }
 
-function SingleProviderTooltip({ active, payload }: any) {
+function SingleProviderTooltip({ active, payload, provider }: any) {
 	if (!active || !payload || !payload.length) return null;
 
 	const data = payload[0]?.payload;

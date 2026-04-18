@@ -44,7 +44,7 @@ export const baseRoutingFields: CELFieldDefinition[] = [
 		inputType: "select",
 		valueEditorType: (operator: string) =>
 			operator === "matches" ? "text" : operator === "in" || operator === "notIn" ? "select" : "select",
-		operators: ["=", "!=", "in", "notIn", "matches", "null", "notNull"],
+		operators: ["=", "!=", "in", "notIn", "matches"],
 		defaultOperator: "=",
 	},
 	{
@@ -67,8 +67,6 @@ export const baseRoutingFields: CELFieldDefinition[] = [
 			{ name: "speech", label: "Speech" },
 			{ name: "transcription", label: "Transcription" },
 			{ name: "count_tokens", label: "Count Tokens" },
-			{ name: "rerank", label: "Rerank" },
-			{ name: "video_generation", label: "Video Generation" },
 		],
 		description: "Filter rules by the type of API request (chat, text, embeddings, images, audio, etc.)",
 	},

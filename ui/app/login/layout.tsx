@@ -1,23 +1,15 @@
 import { ThemeProvider } from "@/components/themeProvider";
 import { ReduxProvider } from "@/lib/store/provider";
-import { createFileRoute } from "@tanstack/react-router";
-import { NuqsAdapter } from "nuqs/adapters/tanstack-router";
-import LoginPage from "./page";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
-function RouteComponent() {
+export default function LoginLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
 			<ReduxProvider>
 				<NuqsAdapter>
-					<div className="bg-background min-h-screen">
-						<LoginPage />
-					</div>
+					<div className="bg-background min-h-screen">{children}</div>
 				</NuqsAdapter>
 			</ReduxProvider>
 		</ThemeProvider>
 	);
 }
-
-export const Route = createFileRoute("/login")({
-	component: RouteComponent,
-});

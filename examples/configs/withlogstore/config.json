@@ -16,8 +16,7 @@
                 {
                     "name": "openai-key-1",
                     "value": "sk-proj-abc",
-                    "weight": 1,
-                    "models": ["*"]
+                    "weight": 1
                 }
             ]
         }

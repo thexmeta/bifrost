@@ -1,3 +1,5 @@
+"use client";
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,8 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getErrorMessage } from "@/lib/store";
-import { useDeleteProviderKeyMutation, useGetProviderKeysQuery, useUpdateProviderKeyMutation } from "@/lib/store/apis/providersApi";
+import { getErrorMessage, useUpdateProviderMutation } from "@/lib/store";
 import { ModelProvider } from "@/lib/types/config";
 import { cn } from "@/lib/utils";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
@@ -29,27 +30,22 @@ interface Props {
 	provider: ModelProvider;
 	headerActions?: ReactNode;
 	isKeyless?: boolean;
+	providerName?: string;
 }
 
-export default function ModelProviderKeysTableView({ provider, className, headerActions, isKeyless }: Props) {
-	const providerName = provider.name?.toLowerCase() ?? "";
-	const isVLLM = providerName === "vllm";
-	const isOllamaOrSGL = providerName === "ollama" || providerName === "sgl";
-	const entityLabel = isVLLM ? "model" : isOllamaOrSGL ? "server" : "key";
-	const entityLabelPlural = isVLLM ? "models" : isOllamaOrSGL ? "servers" : "keys";
+export default function ModelProviderKeysTableView({ provider, className, headerActions, isKeyless, providerName }: Props) {
+	const isVLLM = (providerName ?? "").toLowerCase() === "vllm";
+	const entityLabel = isVLLM ? "model" : "key";
+	const entityLabelPlural = isVLLM ? "models" : "keys";
 	const EntityLabel = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
 	const hasUpdateProviderAccess = useRbac(RbacResource.ModelProvider, RbacOperation.Update);
 	const hasDeleteProviderAccess = useRbac(RbacResource.ModelProvider, RbacOperation.Delete);
-	const [updateProviderKey, { isLoading: isUpdatingProviderKey }] = useUpdateProviderKeyMutation();
-	const [deleteProviderKey, { isLoading: isDeletingProviderKey }] = useDeleteProviderKeyMutation();
-	const { data: keys = [] } = useGetProviderKeysQuery(provider.name);
-	const isMutatingProviderKey = isUpdatingProviderKey || isDeletingProviderKey;
-	const [togglingKeyIds, setTogglingKeyIds] = useState<Set<string>>(new Set());
-	const [showAddNewKeyDialog, setShowAddNewKeyDialog] = useState<{ show: boolean; keyId: string | null } | undefined>(undefined);
-	const [showDeleteKeyDialog, setShowDeleteKeyDialog] = useState<{ show: boolean; keyId: string } | undefined>(undefined);
+	const [updateProvider, { isLoading: isUpdatingProvider }] = useUpdateProviderMutation();
+	const [showAddNewKeyDialog, setShowAddNewKeyDialog] = useState<{ show: boolean; keyIndex: number } | undefined>(undefined);
+	const [showDeleteKeyDialog, setShowDeleteKeyDialog] = useState<{ show: boolean; keyIndex: number } | undefined>(undefined);
 
-	function handleAddKey() {
-		setShowAddNewKeyDialog({ show: true, keyId: null });
+	function handleAddKey(keyIndex: number) {
+		setShowAddNewKeyDialog({ show: true, keyIndex: keyIndex });
 	}
 
 	return (
@@ -59,20 +55,18 @@ export default function ModelProviderKeysTableView({ provider, className, header
 					<AlertDialogContent onClick={(e) => e.stopPropagation()}>
 						<AlertDialogHeader>
 							<AlertDialogTitle>Delete {EntityLabel}</AlertDialogTitle>
-							<AlertDialogDescription>
-								Are you sure you want to delete this {entityLabel}. This action cannot be undone.
-							</AlertDialogDescription>
+							<AlertDialogDescription>Are you sure you want to delete this {entityLabel}. This action cannot be undone.</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter className="pt-4">
-							<AlertDialogCancel onClick={() => setShowDeleteKeyDialog(undefined)} disabled={isMutatingProviderKey}>
+							<AlertDialogCancel onClick={() => setShowDeleteKeyDialog(undefined)} disabled={isUpdatingProvider}>
 								Cancel
 							</AlertDialogCancel>
 							<AlertDialogAction
-								disabled={isMutatingProviderKey || !hasDeleteProviderAccess}
+								disabled={isUpdatingProvider || !hasDeleteProviderAccess}
 								onClick={() => {
-									deleteProviderKey({
-										provider: provider.name,
-										keyId: showDeleteKeyDialog.keyId,
+									updateProvider({
+										...provider,
+										keys: provider.keys.filter((_, index) => index !== showDeleteKeyDialog.keyIndex),
 									})
 										.unwrap()
 										.then(() => {
@@ -97,7 +91,7 @@ export default function ModelProviderKeysTableView({ provider, className, header
 					show={showAddNewKeyDialog.show}
 					onCancel={() => setShowAddNewKeyDialog(undefined)}
 					provider={provider}
-					keyId={showAddNewKeyDialog.keyId}
+					keyIndex={showAddNewKeyDialog.keyIndex}
 					providerName={providerName}
 				/>
 			)}
@@ -111,7 +105,7 @@ export default function ModelProviderKeysTableView({ provider, className, header
 								disabled={!hasUpdateProviderAccess}
 								data-testid="add-key-btn"
 								onClick={() => {
-									handleAddKey();
+									handleAddKey(provider.keys.length);
 								}}
 							>
 								<PlusIcon className="h-4 w-4" />
@@ -127,97 +121,52 @@ export default function ModelProviderKeysTableView({ provider, className, header
 					<p>You can edit the provider configuration using the button above.</p>
 				</div>
 			) : (
-				<div className="flex w-full flex-col gap-2 rounded-sm border">
+				<div className="w-full rounded-sm border flex flex-col gap-2">
 					<Table className="w-full" data-testid="keys-table">
 						<TableHeader className="w-full">
 							<TableRow>
-								<TableHead>{isVLLM ? "Model" : isOllamaOrSGL ? "Server" : "API Key"}</TableHead>
+								<TableHead>{isVLLM ? "Model" : "API Key"}</TableHead>
 								<TableHead>Weight</TableHead>
 								<TableHead>Enabled</TableHead>
 								<TableHead className="text-right"></TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{keys.length === 0 && (
+							{provider.keys.length === 0 && (
 								<TableRow data-testid="keys-table-empty-state">
 									<TableCell colSpan={4} className="py-6 text-center">
 										No {entityLabelPlural} found.
 									</TableCell>
 								</TableRow>
 							)}
-							{keys.map((key) => {
+							{provider.keys.map((key, index) => {
 								const isKeyEnabled = key.enabled ?? true;
 								return (
-									<TableRow
-										key={key.id}
-										data-testid={`key-row-${key.name}`}
-										className="text-sm transition-colors hover:bg-white"
-										onClick={() => {}}
-									>
+									<TableRow key={index} data-testid={`key-row-${key.name}`} className="text-sm transition-colors hover:bg-white" onClick={() => {}}>
 										<TableCell>
 											<div className="flex items-center space-x-2">
 												{key.status === "success" && (
 													<Tooltip>
 														<TooltipTrigger asChild>
-															<button
-																type="button"
-																aria-label="Key status: list models working"
-																data-testid={`key-status-success-${key.name}`}
-																className="inline-flex"
-															>
-																<CheckCircle2 aria-hidden className="h-4 w-4 flex-shrink-0 text-green-600" />
+															<button type="button" aria-label="Key status: list models working" data-testid={`key-status-success-${key.name}`} className="inline-flex">
+																<CheckCircle2 aria-hidden className="text-green-600 h-4 w-4 flex-shrink-0" />
 															</button>
 														</TooltipTrigger>
 														<TooltipContent>List models working</TooltipContent>
 													</Tooltip>
 												)}
-												{key.status === "list_models_failed" &&
-													(() => {
-														// Check if the failure might be due to an env var that the server couldn't resolve
-														const hasEnvVarConfig =
-															key.azure_key_config?.endpoint?.from_env ||
-															key.vertex_key_config?.project_id?.from_env ||
-															key.vertex_key_config?.region?.from_env ||
-															key.bedrock_key_config?.region?.from_env ||
-															key.vllm_key_config?.url?.from_env ||
-															key.value?.from_env;
-														const isEnvResolutionError =
-															hasEnvVarConfig && key.description && /not set|empty|missing/i.test(key.description);
-
-														return isEnvResolutionError ? (
-															<Tooltip>
-																<TooltipTrigger asChild>
-																	<button
-																		type="button"
-																		aria-label="Key status: env var may not be resolved"
-																		data-testid={`key-status-warning-${key.name}`}
-																		className="inline-flex"
-																	>
-																		<AlertCircle aria-hidden className="h-4 w-4 flex-shrink-0 text-orange-500" />
-																	</button>
-																</TooltipTrigger>
-																<TooltipContent className="max-w-xs break-words">
-																	{key.description} — verify the environment variable is set on the server
-																</TooltipContent>
-															</Tooltip>
-														) : (
-															<Tooltip>
-																<TooltipTrigger asChild>
-																	<button
-																		type="button"
-																		aria-label="Key status: list models failed"
-																		data-testid={`key-status-error-${key.name}`}
-																		className="inline-flex"
-																	>
-																		<AlertCircle aria-hidden className="text-destructive h-4 w-4 flex-shrink-0" />
-																	</button>
-																</TooltipTrigger>
-																<TooltipContent className="max-w-xs break-words">
-																	{key.description || "Model discovery failed for this key"}
-																</TooltipContent>
-															</Tooltip>
-														);
-													})()}
+												{key.status === "list_models_failed" && (
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<button type="button" aria-label="Key status: list models failed" data-testid={`key-status-error-${key.name}`} className="inline-flex">
+																<AlertCircle aria-hidden className="text-destructive h-4 w-4 flex-shrink-0" />
+															</button>
+														</TooltipTrigger>
+														<TooltipContent className="max-w-xs break-words">
+															{key.description || "Model discovery failed for this key"}
+														</TooltipContent>
+													</Tooltip>
+												)}
 												<span className="font-mono text-sm">{key.name}</span>
 											</div>
 										</TableCell>
@@ -231,13 +180,11 @@ export default function ModelProviderKeysTableView({ provider, className, header
 												data-testid="key-enabled-switch"
 												checked={isKeyEnabled}
 												size="md"
-												disabled={!hasUpdateProviderAccess || togglingKeyIds.has(key.id)}
-												onCheckedChange={(checked) => {
-													setTogglingKeyIds((prev) => new Set(prev).add(key.id));
-													updateProviderKey({
-														provider: provider.name,
-														keyId: key.id,
-														key: { ...key, enabled: checked },
+												disabled={!hasUpdateProviderAccess}
+												onAsyncCheckedChange={async (checked) => {
+													await updateProvider({
+														...provider,
+														keys: provider.keys.map((k, i) => (i === index ? { ...k, enabled: checked } : k)),
 													})
 														.unwrap()
 														.then(() => {
@@ -245,13 +192,6 @@ export default function ModelProviderKeysTableView({ provider, className, header
 														})
 														.catch((err) => {
 															toast.error(`Failed to update ${entityLabel}`, { description: getErrorMessage(err) });
-														})
-														.finally(() => {
-															setTogglingKeyIds((prev) => {
-																const next = new Set(prev);
-																next.delete(key.id);
-																return next;
-															});
 														});
 												}}
 											/>
@@ -267,9 +207,9 @@ export default function ModelProviderKeysTableView({ provider, className, header
 													<DropdownMenuContent align="end">
 														<DropdownMenuItem
 															onClick={() => {
-																setShowAddNewKeyDialog({ show: true, keyId: key.id });
+																setShowAddNewKeyDialog({ show: true, keyIndex: index });
 															}}
-															disabled={!hasUpdateProviderAccess}
+															disabled={!hasUpdateProviderAccess || !isKeyEnabled}
 														>
 															<PencilIcon className="mr-1 h-4 w-4" />
 															Edit
@@ -277,7 +217,7 @@ export default function ModelProviderKeysTableView({ provider, className, header
 														<DropdownMenuItem
 															variant="destructive"
 															onClick={() => {
-																setShowDeleteKeyDialog({ show: true, keyId: key.id });
+																setShowDeleteKeyDialog({ show: true, keyIndex: index });
 															}}
 															disabled={!hasDeleteProviderAccess}
 														>

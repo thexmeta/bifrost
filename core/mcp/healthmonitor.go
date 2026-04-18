@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -141,14 +140,9 @@ func (chm *ClientHealthMonitor) performHealthCheck() {
 	}
 	chm.mu.Unlock()
 
-	// Get the client connection — capture Conn while holding the lock so we
-	// don't race with removeClientUnsafe zeroing it under the write lock.
+	// Get the client connection
 	chm.manager.mu.RLock()
 	clientState, exists := chm.manager.clientMap[chm.clientID]
-	var conn *client.Client
-	if exists && clientState != nil {
-		conn = clientState.Conn
-	}
 	chm.manager.mu.RUnlock()
 
 	if !exists {
@@ -157,7 +151,7 @@ func (chm *ClientHealthMonitor) performHealthCheck() {
 	}
 
 	var err error
-	if conn == nil {
+	if clientState.Conn == nil {
 		// No active connection — treat as a health check failure
 		err = fmt.Errorf("no active connection")
 	} else {
@@ -166,7 +160,7 @@ func (chm *ClientHealthMonitor) performHealthCheck() {
 		defer cancel()
 
 		if chm.isPingAvailable {
-			err = conn.Ping(ctx)
+			err = clientState.Conn.Ping(ctx)
 		} else {
 			listRequest := mcp.ListToolsRequest{
 				PaginatedRequest: mcp.PaginatedRequest{
@@ -175,7 +169,7 @@ func (chm *ClientHealthMonitor) performHealthCheck() {
 					},
 				},
 			}
-			_, err = conn.ListTools(ctx, listRequest)
+			_, err = clientState.Conn.ListTools(ctx, listRequest)
 		}
 	}
 

@@ -1,5 +1,11 @@
+"use client";
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ProviderCostHistogramResponse, ProviderLatencyHistogramResponse, ProviderTokenHistogramResponse } from "@/lib/types/logs";
+import type {
+	ProviderCostHistogramResponse,
+	ProviderLatencyHistogramResponse,
+	ProviderTokenHistogramResponse,
+} from "@/lib/types/logs";
 import {
 	CHART_COLORS,
 	CHART_HEADER_ACTIONS_CLASS,
@@ -108,13 +114,7 @@ export function ProviderUsageTab({
 										{providerCostProviders.length > 1 && (
 											<Tooltip>
 												<TooltipTrigger asChild>
-													<button
-														type="button"
-														data-testid="provider-cost-legend-more-trigger"
-														className="text-muted-foreground cursor-default"
-													>
-														+{providerCostProviders.length - 1} more
-													</button>
+													<button type="button" data-testid="provider-cost-legend-more-trigger" className="text-muted-foreground cursor-default">+{providerCostProviders.length - 1} more</button>
 												</TooltipTrigger>
 												<TooltipContent>
 													<div className="flex flex-col gap-1">
@@ -190,13 +190,7 @@ export function ProviderUsageTab({
 										{providerTokenProviders.length > 1 && (
 											<Tooltip>
 												<TooltipTrigger asChild>
-													<button
-														type="button"
-														data-testid="provider-token-legend-more-trigger"
-														className="text-muted-foreground cursor-default"
-													>
-														+{providerTokenProviders.length - 1} more
-													</button>
+													<button type="button" data-testid="provider-token-legend-more-trigger" className="text-muted-foreground cursor-default">+{providerTokenProviders.length - 1} more</button>
 												</TooltipTrigger>
 												<TooltipContent>
 													<div className="flex flex-col gap-1">
@@ -273,13 +267,7 @@ export function ProviderUsageTab({
 										{providerLatencyProviders.length > 1 && (
 											<Tooltip>
 												<TooltipTrigger asChild>
-													<button
-														type="button"
-														data-testid="provider-latency-legend-more-trigger"
-														className="text-muted-foreground cursor-default"
-													>
-														+{providerLatencyProviders.length - 1} more
-													</button>
+													<button type="button" data-testid="provider-latency-legend-more-trigger" className="text-muted-foreground cursor-default">+{providerLatencyProviders.length - 1} more</button>
 												</TooltipTrigger>
 												<TooltipContent>
 													<div className="flex flex-col gap-1">

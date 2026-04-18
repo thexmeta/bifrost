@@ -17,9 +17,6 @@ import (
 func TestBudgetResolver_EvaluateRequest_AllowedRequest(t *testing.T) {
 	logger := NewMockLogger()
 	vk := buildVirtualKey("vk1", "sk-bf-test", "Test VK", true)
-	vk.ProviderConfigs = []configstoreTables.TableVirtualKeyProviderConfig{
-		buildProviderConfig("openai", []string{"*"}),
-	}
 
 	store, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
@@ -29,7 +26,7 @@ func TestBudgetResolver_EvaluateRequest_AllowedRequest(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionAllow, result)
 	assertVirtualKeyFound(t, result)
@@ -44,7 +41,7 @@ func TestBudgetResolver_EvaluateRequest_VirtualKeyNotFound(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-nonexistent", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-nonexistent", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionVirtualKeyNotFound, result)
 }
@@ -62,7 +59,7 @@ func TestBudgetResolver_EvaluateRequest_VirtualKeyBlocked(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionVirtualKeyBlocked, result)
 }
@@ -86,7 +83,7 @@ func TestBudgetResolver_EvaluateRequest_ProviderBlocked(t *testing.T) {
 	ctx := &schemas.BifrostContext{}
 
 	// Try to use OpenAI (not allowed)
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionProviderBlocked, result)
 	assertVirtualKeyFound(t, result)
@@ -103,6 +100,7 @@ func TestBudgetResolver_EvaluateRequest_ModelBlocked(t *testing.T) {
 			AllowedModels: []string{"gpt-4", "gpt-4-turbo"}, // Only these models
 			Weight:        bifrost.Ptr(1.0),
 			RateLimit:     nil,
+			Budget:        nil,
 			Keys:          []configstoreTables.TableKey{},
 		},
 	}
@@ -117,7 +115,7 @@ func TestBudgetResolver_EvaluateRequest_ModelBlocked(t *testing.T) {
 	ctx := &schemas.BifrostContext{}
 
 	// Try to use gpt-4o-mini (not in allowed list)
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4o-mini", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4o-mini", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionModelBlocked, result)
 }
@@ -139,7 +137,7 @@ func TestBudgetResolver_EvaluateRequest_RateLimitExceeded_TokenLimit(t *testing.
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionTokenLimited, result)
 	assertRateLimitInfo(t, result)
@@ -162,7 +160,7 @@ func TestBudgetResolver_EvaluateRequest_RateLimitExceeded_RequestLimit(t *testin
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionRequestLimited, result)
 }
@@ -200,7 +198,7 @@ func TestBudgetResolver_EvaluateRequest_RateLimitExpired(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	// Should allow because rate limit was expired and has been reset
 	assertDecision(t, DecisionAllow, result)
@@ -222,7 +220,7 @@ func TestBudgetResolver_EvaluateRequest_BudgetExceeded(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionBudgetExceeded, result)
 }
@@ -249,7 +247,7 @@ func TestBudgetResolver_EvaluateRequest_BudgetExpired(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	// Should allow because budget is expired (will be reset)
 	assertDecision(t, DecisionAllow, result)
@@ -284,7 +282,7 @@ func TestBudgetResolver_EvaluateRequest_MultiLevelBudgetHierarchy(t *testing.T) 
 	ctx := &schemas.BifrostContext{}
 
 	// Test: All under limit should pass
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 	assertDecision(t, DecisionAllow, result)
 
 	// Test: VK budget exceeds should fail
@@ -295,7 +293,7 @@ func TestBudgetResolver_EvaluateRequest_MultiLevelBudgetHierarchy(t *testing.T) 
 		vkBudgetToUpdate.CurrentUsage = 100.0
 		store.budgets.Store("vk-budget", vkBudgetToUpdate)
 	}
-	result = resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result = resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 	assertDecision(t, DecisionBudgetExceeded, result)
 }
 
@@ -317,7 +315,7 @@ func TestBudgetResolver_EvaluateRequest_ProviderLevelRateLimit(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionTokenLimited, result)
 	assertRateLimitInfo(t, result)
@@ -340,7 +338,7 @@ func TestBudgetResolver_CheckRateLimits_BothExceeded(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assertDecision(t, DecisionRateLimited, result)
 	assert.Contains(t, result.Reason, "rate limit")
@@ -361,10 +359,10 @@ func TestBudgetResolver_IsProviderAllowed(t *testing.T) {
 		shouldBeAllowed bool
 	}{
 		{
-			name:            "No provider configs (none allowed - deny-by-default)",
+			name:            "No provider configs (all allowed)",
 			vk:              buildVirtualKey("vk1", "sk-bf-test", "Test", true),
 			provider:        schemas.OpenAI,
-			shouldBeAllowed: false,
+			shouldBeAllowed: true,
 		},
 		{
 			name: "Provider in allowlist",
@@ -410,31 +408,21 @@ func TestBudgetResolver_IsModelAllowed(t *testing.T) {
 		shouldBeAllowed bool
 	}{
 		{
-			name:            "No provider configs (no models allowed - deny-by-default)",
+			name:            "No provider configs (all models allowed)",
 			vk:              buildVirtualKey("vk1", "sk-bf-test", "Test", true),
-			provider:        schemas.OpenAI,
-			model:           "gpt-4",
-			shouldBeAllowed: false,
-		},
-		{
-			name: "Wildcard allowed models (all models allowed)",
-			vk: buildVirtualKeyWithProviders("vk1", "sk-bf-test", "Test",
-				[]configstoreTables.TableVirtualKeyProviderConfig{
-					buildProviderConfig("openai", []string{"*"}), // ["*"] = allow all
-				}),
 			provider:        schemas.OpenAI,
 			model:           "gpt-4",
 			shouldBeAllowed: true,
 		},
 		{
-			name: "Empty allowed models (deny all)",
+			name: "Empty allowed models (all models allowed)",
 			vk: buildVirtualKeyWithProviders("vk1", "sk-bf-test", "Test",
 				[]configstoreTables.TableVirtualKeyProviderConfig{
-					buildProviderConfig("openai", []string{}), // [] = deny all
+					buildProviderConfig("openai", []string{}), // Empty = all allowed
 				}),
 			provider:        schemas.OpenAI,
 			model:           "gpt-4",
-			shouldBeAllowed: false,
+			shouldBeAllowed: true,
 		},
 		{
 			name: "Model in allowlist",
@@ -470,9 +458,6 @@ func TestBudgetResolver_IsModelAllowed(t *testing.T) {
 func TestBudgetResolver_ContextPopulation(t *testing.T) {
 	logger := NewMockLogger()
 	vk := buildVirtualKey("vk1", "sk-bf-test", "Test VK", true)
-	vk.ProviderConfigs = []configstoreTables.TableVirtualKeyProviderConfig{
-		buildProviderConfig("openai", []string{"*"}),
-	}
 	customer := buildCustomer("cust1", "Customer 1", nil)
 	team := buildTeam("team1", "Team 1", nil)
 	team.CustomerID = &customer.ID
@@ -491,7 +476,7 @@ func TestBudgetResolver_ContextPopulation(t *testing.T) {
 	resolver := NewBudgetResolver(store, nil, logger, nil)
 	ctx := &schemas.BifrostContext{}
 
-	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest, false)
+	result := resolver.EvaluateVirtualKeyRequest(ctx, "sk-bf-test", schemas.OpenAI, "gpt-4", schemas.ChatCompletionRequest)
 
 	assert.Equal(t, DecisionAllow, result.Decision)
 

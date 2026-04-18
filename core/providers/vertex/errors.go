@@ -10,13 +10,25 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func parseVertexError(resp *fasthttp.Response) *schemas.BifrostError {
+func parseVertexError(resp *fasthttp.Response, meta *providerUtils.RequestMetadata) *schemas.BifrostError {
+	var providerName schemas.ModelProvider
+	if meta != nil {
+		providerName = meta.Provider
+	}
+
 	var openAIErr schemas.BifrostError
 	var vertexErr []VertexError
 
 	decodedBody, err := providerUtils.CheckAndDecodeBody(resp)
 	if err != nil {
-		bifrostErr := providerUtils.NewBifrostOperationError(schemas.ErrProviderResponseDecode, err)
+		bifrostErr := providerUtils.NewBifrostOperationError(schemas.ErrProviderResponseDecode, err, providerName)
+		if meta != nil {
+			bifrostErr.ExtraFields = schemas.BifrostErrorExtraFields{
+				Provider:       meta.Provider,
+				ModelRequested: meta.Model,
+				RequestType:    meta.RequestType,
+			}
+		}
 		return bifrostErr
 	}
 
@@ -30,6 +42,13 @@ func parseVertexError(resp *fasthttp.Response) *schemas.BifrostError {
 				Message: schemas.ErrProviderResponseEmpty,
 			},
 		}
+		if meta != nil {
+			bifrostErr.ExtraFields = schemas.BifrostErrorExtraFields{
+				Provider:       meta.Provider,
+				ModelRequested: meta.Model,
+				RequestType:    meta.RequestType,
+			}
+		}
 		return bifrostErr
 	}
 
@@ -42,20 +61,26 @@ func parseVertexError(resp *fasthttp.Response) *schemas.BifrostError {
 				Message: schemas.ErrProviderResponseHTML,
 				Error:   errors.New(string(decodedBody)),
 			},
-			ExtraFields: schemas.BifrostErrorExtraFields{
-				RawResponse: string(decodedBody),
-			},
+		}
+		if meta != nil {
+			bifrostErr.ExtraFields = schemas.BifrostErrorExtraFields{
+				Provider:       meta.Provider,
+				ModelRequested: meta.Model,
+				RequestType:    meta.RequestType,
+			}
 		}
 		return bifrostErr
 	}
 
 	createError := func(message string) *schemas.BifrostError {
-		bifrostErr := providerUtils.NewProviderAPIError(message, nil, resp.StatusCode(), nil, nil)
-		var rawResponse interface{}
-		if err := sonic.Unmarshal(decodedBody, &rawResponse); err != nil {
-			rawResponse = string(decodedBody)
+		bifrostErr := providerUtils.NewProviderAPIError(message, nil, resp.StatusCode(), providerName, nil, nil)
+		if meta != nil {
+			bifrostErr.ExtraFields = schemas.BifrostErrorExtraFields{
+				Provider:       meta.Provider,
+				ModelRequested: meta.Model,
+				RequestType:    meta.RequestType,
+			}
 		}
-		bifrostErr.ExtraFields.RawResponse = rawResponse
 		return bifrostErr
 	}
 
@@ -68,7 +93,14 @@ func parseVertexError(resp *fasthttp.Response) *schemas.BifrostError {
 				// Try VertexValidationError format (validation errors from Mistral endpoint)
 				var validationErr VertexValidationError
 				if err := sonic.Unmarshal(decodedBody, &validationErr); err != nil {
-					bifrostErr := providerUtils.NewBifrostOperationError(schemas.ErrProviderResponseUnmarshal, err)
+					bifrostErr := providerUtils.NewBifrostOperationError(schemas.ErrProviderResponseUnmarshal, err, providerName)
+					if meta != nil {
+						bifrostErr.ExtraFields = schemas.BifrostErrorExtraFields{
+							Provider:       meta.Provider,
+							ModelRequested: meta.Model,
+							RequestType:    meta.RequestType,
+						}
+					}
 					return bifrostErr
 				}
 				if len(validationErr.Detail) > 0 {

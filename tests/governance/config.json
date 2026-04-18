@@ -7,7 +7,6 @@
           "name": "OpenAI Test Key",
           "value": "env.OPENAI_API_KEY",
           "weight": 1,
-          "models": ["*"],
           "use_for_batch_api": true
         }
       ],
@@ -21,7 +20,6 @@
           "name": "Anthropic Test Key",
           "value": "env.ANTHROPIC_API_KEY",
           "weight": 1,
-          "models": ["*"],
           "use_for_batch_api": true
         }
       ],
@@ -34,8 +32,7 @@
         {
           "name": "OpenRouter Test Key",
           "value": "env.OPENROUTER_API_KEY",
-          "weight": 1,
-          "models": ["*"]
+          "weight": 1
         }
       ],
       "network_config": {
@@ -62,6 +59,7 @@
     "enable_logging": true,
     "enforce_auth_on_inference": true,
     "allow_direct_keys": false,
-    "max_request_body_size_mb": 100
+    "max_request_body_size_mb": 100,
+    "enable_litellm_fallbacks": false
   }
 }

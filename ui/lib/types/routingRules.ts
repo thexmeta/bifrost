@@ -23,7 +23,6 @@ export interface RoutingRule {
 	scope_id?: string;
 	priority: number;
 	enabled: boolean;
-	chain_rule: boolean;
 	query?: RuleGroupType;
 	created_at: string;
 	updated_at: string;
@@ -39,7 +38,6 @@ export interface CreateRoutingRuleRequest {
 	scope_id?: string;
 	priority: number;
 	enabled?: boolean;
-	chain_rule?: boolean;
 	query?: RuleGroupType;
 }
 
@@ -82,7 +80,6 @@ export interface RoutingRuleFormData {
 	scope_id: string;
 	priority: number;
 	enabled: boolean;
-	chain_rule: boolean;
 	query?: RuleGroupType;
 	isDirty?: boolean;
 }
@@ -118,6 +115,5 @@ export const DEFAULT_ROUTING_RULE_FORM_DATA: RoutingRuleFormData = {
 	scope_id: "",
 	priority: 0,
 	enabled: true,
-	chain_rule: false,
 	isDirty: false,
 };

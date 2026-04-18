@@ -1,17 +1,12 @@
-import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
+"use client";
+
 import { NoPermissionView } from "@/components/noPermissionView";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import GovernancePage from "./page";
 
-function RouteComponent() {
+export default function GovernanceLayout({ children }: { children: React.ReactNode }) {
 	const hasGovernanceAccess = useRbac(RbacResource.Governance, RbacOperation.View);
-	const childMatches = useChildMatches();
 	if (!hasGovernanceAccess) {
 		return <NoPermissionView entity="governance" />;
 	}
-	return childMatches.length === 0 ? <GovernancePage /> : <Outlet />;
+	return <div>{children}</div>;
 }
-
-export const Route = createFileRoute("/workspace/governance")({
-	component: RouteComponent,
-});

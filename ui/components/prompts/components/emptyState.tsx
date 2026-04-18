@@ -13,12 +13,7 @@ export function EmptyState() {
 					{canCreate ? (
 						<>
 							Select a prompt from the sidebar or{" "}
-							<Button
-								variant="link"
-								className="h-auto p-0 text-sm"
-								data-testid="empty-state-create-prompt-link"
-								onClick={() => setPromptSheet({ open: true })}
-							>
+							<Button variant="link" className="h-auto p-0 text-sm" data-testid="empty-state-create-prompt-link" onClick={() => setPromptSheet({ open: true })}>
 								create a new one
 							</Button>
 						</>

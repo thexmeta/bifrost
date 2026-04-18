@@ -12,14 +12,15 @@
  */
 
 /** Matches {{ variable_name }} with optional whitespace inside braces */
-export const JINJA_VAR_REGEX = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*\}\}/g;
+export const JINJA_VAR_REGEX = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*\}\}/g
+
 
 /**
  * Highlight patterns for Jinja2 variables in rich textareas
  */
 export const JINJA_VAR_HIGHLIGHT_PATTERNS = [
 	{
-		pattern: /\{\{\s*[a-zA-Z_][a-zA-Z0-9_.]*\s*\}\}/g,
+		pattern: /{{.*?}}/g,
 		className: "outline-content-brand-light text-sm cursor-pointer bg-green-500/20",
 		validate: (part: string) => {
 			return (

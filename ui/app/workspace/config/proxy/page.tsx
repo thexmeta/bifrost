@@ -1,16 +1,18 @@
+"use client";
+
 import { IS_ENTERPRISE } from "@/lib/constants/config";
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import ProxyView from "../views/proxyView";
 
 export default function ProxyPage() {
-	const navigate = useNavigate();
+	const router = useRouter();
 
 	useEffect(() => {
 		if (!IS_ENTERPRISE) {
-			navigate({ to: "/workspace/config/client-settings", replace: true });
+			router.replace("/workspace/config/client-settings");
 		}
-	}, [navigate]);
+	}, [router]);
 
 	if (!IS_ENTERPRISE) {
 		return null;

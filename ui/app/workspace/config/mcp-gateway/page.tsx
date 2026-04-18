@@ -1,3 +1,5 @@
+"use client";
+
 import MCPGatewayView from "../views/mcpView";
 
 export default function MCPGatewayPage() {

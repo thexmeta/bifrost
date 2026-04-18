@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
@@ -53,9 +55,15 @@ export const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>((pro
 	};
 
 	return (
-		<div ref={forwardedRef} className={cn("inline-flex h-9 w-full items-center gap-1", className)}>
+		<div
+			ref={forwardedRef}
+			className={cn(
+				"inline-flex h-9 w-full items-center gap-1",
+				className,
+			)}
+		>
 			<Select value={hour12.toString()} onValueChange={handleHourChange}>
-				<SelectTrigger size="sm" className="h-9 w-[70px]">
+				<SelectTrigger size="sm" className="w-[70px] h-9">
 					<SelectValue placeholder="HH" />
 				</SelectTrigger>
 				<SelectContent>
@@ -68,7 +76,7 @@ export const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>((pro
 			</Select>
 			<span className="text-muted-foreground">:</span>
 			<Select value={minute.toString()} onValueChange={handleMinuteChange}>
-				<SelectTrigger size="sm" className="h-9 w-[70px]">
+				<SelectTrigger size="sm" className="w-[70px] h-9">
 					<SelectValue placeholder="MM" />
 				</SelectTrigger>
 				<SelectContent>
@@ -80,7 +88,7 @@ export const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>((pro
 				</SelectContent>
 			</Select>
 			<Select value={period} onValueChange={(v) => handlePeriodChange(v as "AM" | "PM")}>
-				<SelectTrigger size="sm" className="h-9 w-[70px]">
+				<SelectTrigger size="sm" className="w-[70px] h-9">
 					<SelectValue placeholder="AM" />
 				</SelectTrigger>
 				<SelectContent>

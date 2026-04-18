@@ -21,7 +21,7 @@ Briefly explain the purpose of this PR and the problem it solves.
 - [ ] Transports (HTTP)
 - [ ] Providers/Integrations
 - [ ] Plugins
-- [ ] UI (React)
+- [ ] UI (Next.js)
 - [ ] Docs
 
 ## How to test

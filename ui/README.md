@@ -4,7 +4,7 @@ A modern, production-ready web interface for the [Bifrost AI Gateway](https://gi
 
 ## Overview
 
-Bifrost UI is a React + Vite + TanStack Router web dashboard that serves as the control center for your Bifrost AI Gateway. It provides an intuitive interface to monitor AI requests, configure providers, manage MCP clients, and analyze performance metrics.
+Bifrost UI is a Next.js-powered web dashboard that serves as the control center for your Bifrost AI Gateway. It provides an intuitive interface to monitor AI requests, configure providers, manage MCP clients, and analyze performance metrics.
 
 ### Key Features
 
@@ -40,14 +40,14 @@ The development server runs on `http://localhost:3000` and connects to your Bifr
 
 ```bash
 # Development only - customize Bifrost backend port
-BIFROST_PORT=8080
+NEXT_PUBLIC_BIFROST_PORT=8080
 ```
 
 ## Architecture
 
 ### Technology Stack
 
-- **Framework**: React 19 + Vite + TanStack Router
+- **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS + Radix UI components
 - **State Management**: Redux Toolkit with RTK Query
@@ -60,7 +60,7 @@ BIFROST_PORT=8080
 ```
 ┌─────────────────┐    HTTP/WebSocket    ┌──────────────────┐
 │   Bifrost UI    │ ◄─────────────────► │ Bifrost HTTP     │
-│   (React+Vite)  │                     │ Transport (Go)   │
+│   (Next.js)     │                     │ Transport (Go)   │
 └─────────────────┘                     └──────────────────┘
         │                                        │
         │ Build artifacts                        │
@@ -96,7 +96,6 @@ Model Context Protocol integration for advanced AI capabilities including tool i
 Extend Bifrost with powerful plugins for observability, testing, caching, and custom functionality.
 
 **Available Plugins:**
-
 - [Maxim Logger](https://docs.getbifrost.ai/features/observability/maxim) - Advanced LLM observability
 - [Response Mocker](https://docs.getbifrost.ai/features/plugins/mocker) - Mock responses for testing
 - [Semantic Cache](https://docs.getbifrost.ai/features/semantic-caching) - Intelligent response caching
@@ -110,7 +109,7 @@ Extend Bifrost with powerful plugins for observability, testing, caching, and cu
 
 ```
 ui/
-├── app/                    # TanStack Router pages
+├── app/                    # Next.js App Router pages
 │   ├── page.tsx           # Main logs dashboard
 │   ├── config/            # Provider & MCP configuration
 │   ├── docs/              # Documentation browser
@@ -142,16 +141,16 @@ const { data: logs, error, isLoading } = useGetLogsQuery({ filters, pagination }
 const [createProvider] = useCreateProviderMutation();
 
 const handleCreate = async () => {
-	try {
-		await createProvider({
-			provider: "openai",
-			keys: [{ value: "sk-...", models: ["gpt-4"], weight: 1 }],
-			// ... other config
-		}).unwrap();
-		// Success handling
-	} catch (error) {
-		console.error(getErrorMessage(error));
-	}
+  try {
+    await createProvider({
+      provider: "openai",
+      keys: [{ value: "sk-...", models: ["gpt-4"], weight: 1 }],
+      // ... other config
+    }).unwrap();
+    // Success handling
+  } catch (error) {
+    console.error(getErrorMessage(error));
+  }
 };
 ```
 

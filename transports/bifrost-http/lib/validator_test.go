@@ -605,7 +605,7 @@ func TestValidateConfigSchema_VirtualKeyProviderConfig_MissingProvider(t *testin
 // =============================================================================
 
 func TestValidateConfigSchema_VirtualKeyMCPConfig_Valid(t *testing.T) {
-	// Valid virtual key MCP config identifying the MCP client by mcp_client_id (DB form)
+	// Valid virtual key MCP config with required field: mcp_client_id
 	validConfig := `{
 		"governance": {
 			"virtual_keys": [
@@ -629,11 +629,9 @@ func TestValidateConfigSchema_VirtualKeyMCPConfig_Valid(t *testing.T) {
 	}
 }
 
-func TestValidateConfigSchema_VirtualKeyMCPConfig_ValidWithClientName(t *testing.T) {
-	// Valid virtual key MCP config identifying the MCP client by mcp_client_name
-	// (config-file form — resolved to mcp_client_id at startup). Either identifier
-	// alone is sufficient; neither is required at the JSON Schema level.
-	validConfig := `{
+func TestValidateConfigSchema_VirtualKeyMCPConfig_MissingMCPClientId(t *testing.T) {
+	// Missing required field: mcp_client_id
+	invalidConfig := `{
 		"governance": {
 			"virtual_keys": [
 				{
@@ -642,7 +640,6 @@ func TestValidateConfigSchema_VirtualKeyMCPConfig_ValidWithClientName(t *testing
 					"value": "vk_test_123456",
 					"mcp_configs": [
 						{
-							"mcp_client_name": "my-mcp-client",
 							"tools_to_execute": ["tool1"]
 						}
 					]
@@ -651,9 +648,9 @@ func TestValidateConfigSchema_VirtualKeyMCPConfig_ValidWithClientName(t *testing
 		}
 	}`
 
-	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
-	if err != nil {
-		t.Errorf("expected virtual key MCP config with mcp_client_name to pass validation, got error: %v", err)
+	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
+	if err == nil {
+		t.Error("expected config missing 'mcp_client_id' in virtual key MCP config to fail validation")
 	}
 }
 

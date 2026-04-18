@@ -1,16 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { NoPermissionView } from "@/components/noPermissionView";
-import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import RBACRedirectPage from "./page";
+"use client"
 
-function RouteComponent() {
-	const hasRbacAccess = useRbac(RbacResource.RBAC, RbacOperation.View);
-	if (!hasRbacAccess) {
-		return <NoPermissionView entity="roles and permissions" />;
-	}
-	return <RBACRedirectPage />;
+import { NoPermissionView } from "@/components/noPermissionView"
+import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib"
+
+export default function RBACLayout({ children }: { children: React.ReactNode }) {
+  const hasRbacAccess = useRbac(RbacResource.RBAC, RbacOperation.View)
+  if (!hasRbacAccess) {
+    return <NoPermissionView entity="roles and permissions" />
+  }
+  return <div>{children}</div>
 }
-
-export const Route = createFileRoute("/workspace/rbac")({
-	component: RouteComponent,
-});

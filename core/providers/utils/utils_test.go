@@ -1107,8 +1107,7 @@ func TestBuildClientStreamChunk_ImageGenerationStripping(t *testing.T) {
 
 	t.Run("logging-only: raw fields stripped from image gen chunk, original preserved", func(t *testing.T) {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
-		ctx.SetValue(schemas.BifrostContextKeyDropRawRequestFromClient, true)
-		ctx.SetValue(schemas.BifrostContextKeyDropRawResponseFromClient, true)
+		ctx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
 
 		chunk := BuildClientStreamChunk(ctx, response, nil)
 		if chunk.BifrostImageGenerationStreamResponse == nil {
@@ -1149,9 +1148,9 @@ func TestBuildClientStreamChunk_ImageGenerationStripping(t *testing.T) {
 }
 
 // TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChunk verifies
-// that when drop-raw context flags are set, ProcessAndSendResponse strips RawRequest and
-// RawResponse from the outgoing stream chunk, while leaving other ExtraFields intact.
-// It also verifies that the original BifrostResponse is not mutated
+// that when BifrostContextKeyRawRequestResponseForLogging is set, ProcessAndSendResponse
+// strips RawRequest and RawResponse from the outgoing stream chunk, while leaving other
+// ExtraFields intact. It also verifies that the original BifrostResponse is not mutated
 // (shared object safety for PostLLMHook goroutines).
 func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChunk(t *testing.T) {
 	rawReq := json.RawMessage(`{"model":"gpt-4","messages":[]}`)
@@ -1178,8 +1177,7 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChu
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 			if tt.loggingOnly {
-				ctx.SetValue(schemas.BifrostContextKeyDropRawRequestFromClient, true)
-				ctx.SetValue(schemas.BifrostContextKeyDropRawResponseFromClient, true)
+				ctx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
 			}
 
 			response := &schemas.BifrostResponse{
@@ -1239,9 +1237,9 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChu
 }
 
 // TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk verifies
-// that when drop-raw context flags are set, raw data is stripped from BifrostError
-// payloads embedded in stream chunks, without mutating the shared BifrostError object
-// (shared object safety for PostLLMHook goroutines).
+// that when BifrostContextKeyRawRequestResponseForLogging is set, raw data is stripped
+// from BifrostError payloads embedded in stream chunks, without mutating the shared
+// BifrostError object (shared object safety for PostLLMHook goroutines).
 func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk(t *testing.T) {
 	rawReq := json.RawMessage(`{"model":"gpt-4"}`)
 	rawResp := json.RawMessage(`{"error":"rate limit exceeded"}`)
@@ -1267,8 +1265,7 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk(
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 			if tt.loggingOnly {
-				ctx.SetValue(schemas.BifrostContextKeyDropRawRequestFromClient, true)
-				ctx.SetValue(schemas.BifrostContextKeyDropRawResponseFromClient, true)
+				ctx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
 			}
 
 			// Use a postHookRunner that converts the response to a BifrostError with raw data

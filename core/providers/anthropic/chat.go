@@ -722,8 +722,12 @@ func (response *AnthropicMessageResponse) ToBifrostChatResponse(ctx *schemas.Bif
 
 	// Initialize Bifrost response
 	bifrostResponse := &schemas.BifrostChatResponse{
-		ID:      response.ID,
-		Model:   response.Model,
+		ID:    response.ID,
+		Model: response.Model,
+		ExtraFields: schemas.BifrostResponseExtraFields{
+			RequestType: schemas.ChatCompletionRequest,
+			Provider:    schemas.Anthropic,
+		},
 		Created: int(time.Now().Unix()),
 	}
 

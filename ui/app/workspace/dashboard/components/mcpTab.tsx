@@ -1,3 +1,5 @@
+"use client";
+
 import type { MCPCostHistogramResponse, MCPHistogramResponse, MCPTopToolsResponse } from "@/lib/types/logs";
 import { CHART_COLORS, CHART_HEADER_ACTIONS_CLASS, CHART_HEADER_CONTROLS_CLASS, CHART_HEADER_LEGEND_CLASS } from "../utils/chartUtils";
 import { ChartCard } from "./charts/chartCard";

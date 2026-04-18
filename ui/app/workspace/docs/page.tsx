@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import GradientHeader from "@/components/ui/gradientHeader";
 import { BookOpen, Code, ExternalLink, FileText, GitBranch, Play, Shield, Users, Zap } from "lucide-react";
+import Link from "next/link";
 
 const docSections = [
 	{
@@ -93,26 +94,16 @@ export default function DocsPage() {
 						</p>
 						<div className="flex justify-center gap-4">
 							<Button asChild>
-								<a
-									href="https://github.com/maximhq/bifrost/tree/main/docs"
-									target="_blank"
-									rel="noopener noreferrer"
-									data-testid="docs-view-full-documentation-link"
-								>
+								<Link href="https://github.com/maximhq/bifrost/tree/main/docs" target="_blank">
 									<ExternalLink className="mr-2 h-4 w-4" />
 									View Full Documentation
-								</a>
+								</Link>
 							</Button>
 							<Button variant="outline" asChild>
-								<a
-									href="https://github.com/maximhq/bifrost/tree/main/docs/quickstart"
-									target="_blank"
-									rel="noopener noreferrer"
-									data-testid="docs-quick-start-guide-link"
-								>
+								<Link href="https://github.com/maximhq/bifrost/tree/main/docs/quickstart" target="_blank">
 									<Play className="mr-2 h-4 w-4" />
 									Quick Start Guide
-								</a>
+								</Link>
 							</Button>
 						</div>
 					</div>
@@ -149,16 +140,10 @@ export default function DocsPage() {
 											</ul>
 										</div>
 										<Button asChild variant="outline" className="w-full">
-											<a
-												href={section.url}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="flex items-center justify-center gap-2"
-												data-testid={`docs-read-more-${section.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
-											>
+											<Link href={section.url} target="_blank" className="flex items-center justify-center gap-2">
 												Read More
 												<ExternalLink className="h-4 w-4" />
-											</a>
+											</Link>
 										</Button>
 									</CardContent>
 								</Card>
@@ -180,15 +165,10 @@ export default function DocsPage() {
 								<CardContent>
 									<p className="text-muted-foreground mb-4 text-sm">{doc.content}</p>
 									<Button asChild className="w-full">
-										<a
-											href={doc.href}
-											target="_blank"
-											rel="noopener noreferrer"
-											data-testid={`docs-featured-${doc.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
-										>
+										<Link href={doc.href} target="_blank">
 											<doc.icon className="mr-2 h-4 w-4" />
 											{doc.buttonText}
-										</a>
+										</Link>
 									</Button>
 								</CardContent>
 							</Card>

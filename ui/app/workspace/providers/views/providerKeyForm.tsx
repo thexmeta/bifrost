@@ -2,8 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ConfigSyncAlert } from "@/components/ui/configSyncAlert";
 import { Form } from "@/components/ui/form";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getErrorMessage } from "@/lib/store";
-import { useCreateProviderKeyMutation, useGetProviderKeysQuery, useUpdateProviderKeyMutation } from "@/lib/store/apis/providersApi";
+import { getErrorMessage, useUpdateProviderMutation } from "@/lib/store";
 import { ModelProvider } from "@/lib/types/config";
 import { modelProviderKeySchema } from "@/lib/types/schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,7 +15,7 @@ import { z } from "zod";
 import { ApiKeyFormFragment } from "../fragments";
 interface Props {
 	provider: ModelProvider;
-	keyId: string | null;
+	keyIndex: number;
 	onCancel: () => void;
 	onSave: () => void;
 }
@@ -28,35 +27,26 @@ const providerKeyFormSchema = z.object({
 
 type ProviderKeyFormValues = z.infer<typeof modelProviderKeySchema>;
 
-export default function ProviderKeyForm({ provider, keyId, onCancel, onSave }: Props) {
-	const [createProviderKey, { isLoading: isCreatingProviderKey }] = useCreateProviderKeyMutation();
-	const [updateProviderKey, { isLoading: isUpdatingProviderKey }] = useUpdateProviderKeyMutation();
-	const { data: keys = [] } = useGetProviderKeysQuery(provider.name);
-	const isEditing = keyId !== null;
-	const currentKey = keyId ? keys.find((k) => k.id === keyId) : undefined;
+export default function ProviderKeyForm({ provider, keyIndex, onCancel, onSave }: Props) {
+	const [updateProvider, { isLoading: isUpdatingProvider }] = useUpdateProviderMutation();
+	const isEditing = provider?.keys?.[keyIndex] !== undefined;
+	const currentKey = provider?.keys?.[keyIndex];
 
 	const form = useForm({
 		resolver: zodResolver(providerKeyFormSchema),
 		mode: "onChange",
 		reValidateMode: "onChange",
 		defaultValues: {
-			key: (currentKey as ProviderKeyFormValues) ?? {
+			key: (provider?.keys?.[keyIndex] as ProviderKeyFormValues) ?? {
 				id: uuid(),
 				name: "",
-				models: ["*"],
+				models: [],
 				blacklisted_models: [],
 				weight: 1.0,
 				enabled: true,
 			},
 		},
 	});
-
-	// Reset form when currentKey arrives (handles late async resolution)
-	// Skip reset if user has unsaved edits to avoid discarding changes during background refetches
-	useEffect(() => {
-		if (!isEditing || !currentKey || form.formState.isDirty) return;
-		form.reset({ key: currentKey as ProviderKeyFormValues });
-	}, [isEditing, currentKey, form]);
 
 	// Trigger validation on mount when editing existing data
 	useEffect(() => {
@@ -76,39 +66,18 @@ export default function ProviderKeyForm({ provider, keyId, onCancel, onSave }: P
 	}, [form?.formState.errors, form?.formState.isValid, form?.formState.isDirty]);
 
 	const onSubmit = (value: any) => {
-		if (isEditing && !currentKey) return;
-		// Strip internal _auth_type fields before sending to API
-		const key = { ...value.key };
-		if (key.azure_key_config) {
-			const { _auth_type, ...rest } = key.azure_key_config;
-			key.azure_key_config = rest;
-		}
-		if (key.vertex_key_config) {
-			const { _auth_type, ...rest } = key.vertex_key_config;
-			key.vertex_key_config = rest;
-		}
-		if (key.bedrock_key_config) {
-			const { _auth_type, ...rest } = key.bedrock_key_config;
-			key.bedrock_key_config = rest;
-		}
-		const mutation = isEditing
-			? updateProviderKey({
-					provider: provider.name,
-					keyId: currentKey!.id,
-					key,
-				})
-			: createProviderKey({
-					provider: provider.name,
-					key,
-				});
-
-		mutation
+		const keys = provider.keys ?? [];
+		const updatedKeys = [...keys.slice(0, keyIndex), value.key, ...keys.slice(keyIndex + 1)];
+		updateProvider({
+			...provider,
+			keys: updatedKeys,
+		})
 			.unwrap()
 			.then(() => {
 				onSave();
 			})
 			.catch((err) => {
-				toast.error(isEditing ? "Error updating key" : "Error creating key", {
+				toast.error("Error while updating key", {
 					description: getErrorMessage(err),
 				});
 			});
@@ -130,8 +99,8 @@ export default function ProviderKeyForm({ provider, keyId, onCancel, onSave }: P
 									<span>
 										<Button
 											type="submit"
-											disabled={!form.formState.isDirty}
-											isLoading={form.formState.isSubmitting || isCreatingProviderKey || isUpdatingProviderKey}
+											disabled={!form.formState.isDirty || !form.formState.isValid}
+											isLoading={form.formState.isSubmitting || isUpdatingProvider}
 											data-testid="key-save-btn"
 										>
 											<Save className="h-4 w-4" />

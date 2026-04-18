@@ -16,10 +16,9 @@ import (
 
 // mockHandlerStore implements lib.HandlerStore for testing
 type mockHandlerStore struct {
-	allowDirectKeys            bool
-	headerMatcher              *lib.HeaderMatcher
-	availableProviders         []schemas.ModelProvider
-	mcpHeaderCombinedAllowlist schemas.WhiteList
+	allowDirectKeys bool
+	headerMatcher   *lib.HeaderMatcher
+	availableProviders []schemas.ModelProvider
 }
 
 func (m *mockHandlerStore) ShouldAllowDirectKeys() bool {
@@ -48,10 +47,6 @@ func (m *mockHandlerStore) GetAsyncJobResultTTL() int {
 
 func (m *mockHandlerStore) GetKVStore() *kvstore.Store {
 	return nil
-}
-
-func (m *mockHandlerStore) GetMCPHeaderCombinedAllowlist() schemas.WhiteList {
-	return m.mcpHeaderCombinedAllowlist
 }
 
 // Ensure mockHandlerStore implements lib.HandlerStore

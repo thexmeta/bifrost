@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -117,6 +119,8 @@ export function DateTimePickerWithRange(props: DateTimePickerWithRangeProps) {
 						variant="outline"
 						data-testid={props.triggerTestId}
 						className={cn(
+							!predefinedPeriod && "w-[360px]",
+							predefinedPeriod && "w-[140px]",
 							"justify-start text-left font-normal",
 							!date && "text-content-disabled",
 							buttonClassName,

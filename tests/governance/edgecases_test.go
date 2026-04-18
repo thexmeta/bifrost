@@ -71,10 +71,8 @@ func TestCrissCrossComplexBudgetHierarchy(t *testing.T) {
 			},
 			ProviderConfigs: []ProviderConfigRequest{
 				{
-					Provider:      "openai",
-					Weight:        float64Ptr(1.0),
-					AllowedModels: []string{"*"},
-					KeyIDs:        []string{"*"},
+					Provider: "openai",
+					Weight:   1.0,
 					Budget: &BudgetRequest{
 						MaxLimit:      0.08, // Even tighter provider budget
 						ResetDuration: "1h",

@@ -1,42 +1,14 @@
-import { Alert, AlertDescription } from "@/components/ui/alert";
+"use client";
+
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { DottedSeparator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProviderIconType, RenderProviderIcon } from "@/lib/constants/icons";
 import { ProviderLabels, ProviderName } from "@/lib/constants/logs";
 import { VirtualKey } from "@/lib/types/governance";
-import { cn } from "@/lib/utils";
-import { calculateUsagePercentage, formatCurrency, parseResetPeriod } from "@/lib/utils/governance";
+import { calculateUsagePercentage, formatCurrency, getUsageVariant, parseResetPeriod } from "@/lib/utils/governance";
 import { formatDistanceToNow } from "date-fns";
-import { Lock, Users } from "lucide-react";
-import { useVirtualKeyUsage } from "../hooks/useVirtualKeyUsage";
-
-function usageBarClass(pct: number, exhausted: boolean) {
-	if (exhausted) return "[&>div]:bg-red-500/70";
-	if (pct > 80) return "[&>div]:bg-amber-500/70";
-	return "[&>div]:bg-emerald-500/70";
-}
-
-function UsageLine({ current, max, format }: { current: number; max: number; format: (n: number) => string }) {
-	const pct = calculateUsagePercentage(current, max);
-	const exhausted = max > 0 && current >= max;
-	return (
-		<div className="space-y-2">
-			<div className="flex items-center justify-between gap-3">
-				<span className="font-mono text-sm">
-					{format(current)} <span className="text-muted-foreground">/</span> {format(max)}
-				</span>
-				<span className={cn("text-xs font-medium tabular-nums", exhausted ? "text-red-500" : pct > 80 ? "text-amber-500" : "text-muted-foreground")}>
-					{pct}%
-				</span>
-			</div>
-			<Progress value={Math.min(pct, 100)} className={cn("bg-muted/70 dark:bg-muted/30 h-1.5", usageBarClass(pct, exhausted))} />
-		</div>
-	);
-}
 
 interface VirtualKeyDetailSheetProps {
 	virtualKey: VirtualKey;
@@ -44,9 +16,6 @@ interface VirtualKeyDetailSheetProps {
 }
 
 export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKeyDetailSheetProps) {
-	const { assignedUsers, isManagedByProfile, managingProfile, hasApRateLimit, displayBudgets, displayRateLimit } =
-		useVirtualKeyUsage(virtualKey);
-
 	const getEntityInfo = () => {
 		if (virtualKey.team) {
 			return { type: "Team", name: virtualKey.team.name };
@@ -60,45 +29,25 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 	const entityInfo = getEntityInfo();
 
 	const isExhausted =
-		// Budget exhausted (AP-mirrored when managed, VK-own otherwise)
-		displayBudgets?.some((b) => b.current_usage >= b.max_limit) ||
-		// Rate limits exhausted
-		(displayRateLimit?.token_current_usage &&
-			displayRateLimit?.token_max_limit &&
-			displayRateLimit.token_current_usage >= displayRateLimit.token_max_limit) ||
-		(displayRateLimit?.request_current_usage &&
-			displayRateLimit?.request_max_limit &&
-			displayRateLimit.request_current_usage >= displayRateLimit.request_max_limit);
+		// VK-level budget exhausted
+		(virtualKey.budget?.current_usage && virtualKey.budget?.max_limit && virtualKey.budget.current_usage >= virtualKey.budget.max_limit) ||
+		// VK-level rate limits exhausted
+		(virtualKey.rate_limit?.token_current_usage &&
+			virtualKey.rate_limit?.token_max_limit &&
+			virtualKey.rate_limit.token_current_usage >= virtualKey.rate_limit.token_max_limit) ||
+		(virtualKey.rate_limit?.request_current_usage &&
+			virtualKey.rate_limit?.request_max_limit &&
+			virtualKey.rate_limit.request_current_usage >= virtualKey.rate_limit.request_max_limit);
 
 	return (
 		<Sheet open onOpenChange={onClose}>
 			<SheetContent className="flex w-full flex-col overflow-x-hidden p-8 sm:max-w-2xl">
-				<SheetHeader className="flex flex-col items-start p-0">
+				<SheetHeader className="p-0 flex flex-col items-start">
 					<SheetTitle>{virtualKey.name}</SheetTitle>
 					<SheetDescription>{virtualKey.description || "Virtual key details and usage information"}</SheetDescription>
 				</SheetHeader>
 
-				<div className="space-y-6">
-					{isManagedByProfile ? (
-						<Alert variant="info">
-							<Lock className="h-4 w-4" />
-							<AlertDescription>
-								This virtual key is managed by an access profile. You can rename it or update its description from the edit button, but
-								providers, budgets, rate limits, and MCP access are controlled by the profile and must be changed there.
-							</AlertDescription>
-						</Alert>
-					) : null}
-
-					{assignedUsers.length > 0 ? (
-						<div className="space-y-1">
-							<Label className="text-sm font-medium">Assigned Users</Label>
-							<div className="flex items-center gap-2">
-								<Users className="text-muted-foreground h-4 w-4" />
-								<span className="text-sm">{assignedUsers.map((u) => u.name || u.email).join(", ")}</span>
-							</div>
-						</div>
-					) : null}
-
+				<div className="space-y-6 ">
 					{/* Basic Information */}
 					<div className="space-y-4">
 						<h3 className="font-semibold">Basic Information</h3>
@@ -136,14 +85,14 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 					</div>
 
 					<DottedSeparator />
-
+					
 					{/* Provider Configurations */}
 					<div className="space-y-4">
 						<h3 className="font-semibold">Provider Configurations</h3>
 
 						<div className="space-y-3">
 							{!virtualKey.provider_configs || virtualKey.provider_configs.length === 0 ? (
-								<span className="text-muted-foreground text-sm">No providers configured (deny-by-default)</span>
+								<span className="text-muted-foreground text-sm">All providers allowed with default settings</span>
 							) : (
 								<div className="space-y-4">
 									{virtualKey.provider_configs.map((config, index) => (
@@ -162,13 +111,9 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 											{/* Basic Config */}
 											<div className="space-y-3">
 												<div className="grid grid-cols-3 items-start gap-4">
-													<span className="text-muted-foreground pt-0.5 text-sm font-medium">Allowed Models</span>
+													<span className="text-muted-foreground text-sm pt-0.5 font-medium">Allowed Models</span>
 													<div className="col-span-2">
-														{config.allowed_models?.includes("*") ? (
-															<Badge variant="success" className="text-xs">
-																All Models
-															</Badge>
-														) : config.allowed_models && config.allowed_models.length > 0 ? (
+														{config.allowed_models && config.allowed_models.length > 0 ? (
 															<div className="flex flex-wrap gap-1">
 																{config.allowed_models.map((model) => (
 																	<Badge key={model} variant="secondary" className="text-xs">
@@ -177,21 +122,15 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 																))}
 															</div>
 														) : (
-															<Badge variant="destructive" className="text-xs">
-																No models (deny all)
-															</Badge>
+															<span className="text-muted-foreground text-sm">All models allowed</span>
 														)}
 													</div>
 												</div>
 
 												<div className="grid grid-cols-3 items-start gap-4">
-													<span className="text-muted-foreground pt-0.5 text-sm font-medium">Allowed Keys</span>
+													<span className="text-muted-foreground text-sm pt-0.5 font-medium">Allowed Keys</span>
 													<div className="col-span-2">
-														{config.allow_all_keys ? (
-															<Badge variant="success" className="text-xs">
-																All Keys
-															</Badge>
-														) : config.keys && config.keys.length > 0 ? (
+														{config.keys && config.keys.length > 0 ? (
 															<div className="flex flex-wrap gap-1">
 																{config.keys.map((key) => (
 																	<Badge key={key.key_id} variant="outline" className="text-xs">
@@ -200,33 +139,43 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 																))}
 															</div>
 														) : (
-															<Badge variant="destructive" className="text-xs">
-																No keys (deny all)
-															</Badge>
+															<span className="text-muted-foreground text-sm">All keys allowed</span>
 														)}
 													</div>
 												</div>
 
-												{/* Provider Budgets */}
-												{config.budgets && config.budgets.length > 0 && (
+												{/* Provider Budget */}
+												{config.budget && (
 													<>
 														<DottedSeparator />
 														<div className="space-y-2">
-															<h4 className="text-sm font-medium">Provider Budgets</h4>
-															{config.budgets.map((b, bIdx) => (
-																<div key={bIdx} className="space-y-2">
-																	<UsageLine current={b.current_usage} max={b.max_limit} format={formatCurrency} />
-																	<div className="text-muted-foreground flex items-center justify-between text-xs">
-																		<span>
-																			Resets {parseResetPeriod(b.reset_duration)}
-																			{virtualKey.calendar_aligned && " (calendar)"}
+															<h4 className="text-sm font-medium">Provider Budget</h4>
+															<div className="grid grid-cols-3 items-center gap-4">
+																<span className="text-muted-foreground text-sm">Usage</span>
+																<div className="col-span-2">
+																	<div className="flex items-center gap-2">
+																		<span className="font-mono text-sm">
+																			{formatCurrency(config.budget.current_usage)} / {formatCurrency(config.budget.max_limit)}
 																		</span>
-																		{b.last_reset ? (
-																			<span>Last reset {formatDistanceToNow(new Date(b.last_reset), { addSuffix: true })}</span>
-																		) : null}
+																		<Badge
+																			variant={config.budget.current_usage >= config.budget.max_limit ? "destructive" : "default"}
+																			className="text-xs"
+																		>
+																			{Math.round((config.budget.current_usage / config.budget.max_limit) * 100)}%
+																		</Badge>
 																	</div>
 																</div>
-															))}
+															</div>
+															<div className="grid grid-cols-3 items-center gap-4">
+																<span className="text-muted-foreground text-sm">Reset Period</span>
+																<div className="col-span-2 text-sm">{parseResetPeriod(config.budget.reset_duration)}</div>
+															</div>
+															<div className="grid grid-cols-3 items-center gap-4">
+																<span className="text-muted-foreground text-sm">Last Reset</span>
+																<div className="col-span-2 text-sm">
+																	{formatDistanceToNow(new Date(config.budget.last_reset), { addSuffix: true })}
+																</div>
+															</div>
 														</div>
 													</>
 												)}
@@ -239,42 +188,94 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 															<h4 className="text-sm font-medium">Provider Rate Limits</h4>
 
 															{/* Token Limits */}
-															{config.rate_limit.token_max_limit != null ? (
+															{config.rate_limit.token_max_limit && (
 																<div className="space-y-2">
 																	<span className="text-muted-foreground text-xs font-medium">TOKEN LIMITS</span>
-																	<UsageLine
-																		current={config.rate_limit.token_current_usage}
-																		max={config.rate_limit.token_max_limit}
-																		format={(n) => n.toLocaleString()}
-																	/>
-																	<div className="text-muted-foreground flex items-center justify-between text-xs">
-																		<span>Resets {parseResetPeriod(config.rate_limit.token_reset_duration || "")}</span>
-																		{config.rate_limit.token_last_reset ? (
-																				<span>Last reset {formatDistanceToNow(new Date(config.rate_limit.token_last_reset), { addSuffix: true })}</span>
-																			) : null}
+																	<div className="grid grid-cols-3 items-center gap-4">
+																		<span className="text-muted-foreground text-sm">Usage</span>
+																		<div className="col-span-2">
+																			<div className="flex items-center gap-2">
+																				<span className="font-mono text-sm">
+																					{config.rate_limit.token_current_usage} / {config.rate_limit.token_max_limit}
+																				</span>
+																				<Badge
+																					variant={getUsageVariant(
+																						calculateUsagePercentage(
+																							config.rate_limit.token_current_usage,
+																							config.rate_limit.token_max_limit,
+																						),
+																					)}
+																					className="text-xs"
+																				>
+																					{calculateUsagePercentage(
+																						config.rate_limit.token_current_usage,
+																						config.rate_limit.token_max_limit,
+																					)}
+																					%
+																				</Badge>
+																			</div>
+																		</div>
+																	</div>
+																	<div className="grid grid-cols-3 items-center gap-4">
+																		<span className="text-muted-foreground text-sm">Reset Period</span>
+																		<div className="col-span-2 text-sm">
+																			{parseResetPeriod(config.rate_limit.token_reset_duration || "")}
+																		</div>
+																	</div>
+																	<div className="grid grid-cols-3 items-center gap-4">
+																		<span className="text-muted-foreground text-sm">Last Reset</span>
+																		<div className="col-span-2 text-sm">
+																			{formatDistanceToNow(new Date(config.rate_limit.token_last_reset), { addSuffix: true })}
+																		</div>
 																	</div>
 																</div>
-															) : null}
+															)}
 
 															{/* Request Limits */}
-															{config.rate_limit.request_max_limit != null ? (
+															{config.rate_limit.request_max_limit && (
 																<div className="space-y-2">
 																	<span className="text-muted-foreground text-xs font-medium">REQUEST LIMITS</span>
-																	<UsageLine
-																		current={config.rate_limit.request_current_usage}
-																		max={config.rate_limit.request_max_limit}
-																		format={(n) => n.toLocaleString()}
-																	/>
-																	<div className="text-muted-foreground flex items-center justify-between text-xs">
-																		<span>Resets {parseResetPeriod(config.rate_limit.request_reset_duration || "")}</span>
-																		{config.rate_limit.request_last_reset ? (
-																				<span>Last reset {formatDistanceToNow(new Date(config.rate_limit.request_last_reset), { addSuffix: true })}</span>
-																			) : null}
+																	<div className="grid grid-cols-3 items-center gap-4">
+																		<span className="text-muted-foreground text-sm">Usage</span>
+																		<div className="col-span-2">
+																			<div className="flex items-center gap-2">
+																				<span className="font-mono text-sm">
+																					{config.rate_limit.request_current_usage} / {config.rate_limit.request_max_limit}
+																				</span>
+																				<Badge
+																					variant={getUsageVariant(
+																						calculateUsagePercentage(
+																							config.rate_limit.request_current_usage,
+																							config.rate_limit.request_max_limit,
+																						),
+																					)}
+																					className="text-xs"
+																				>
+																					{calculateUsagePercentage(
+																						config.rate_limit.request_current_usage,
+																						config.rate_limit.request_max_limit,
+																					)}
+																					%
+																				</Badge>
+																			</div>
+																		</div>
+																	</div>
+																	<div className="grid grid-cols-3 items-center gap-4">
+																		<span className="text-muted-foreground text-sm">Reset Period</span>
+																		<div className="col-span-2 text-sm">
+																			{parseResetPeriod(config.rate_limit.request_reset_duration || "")}
+																		</div>
+																	</div>
+																	<div className="grid grid-cols-3 items-center gap-4">
+																		<span className="text-muted-foreground text-sm">Last Reset</span>
+																		<div className="col-span-2 text-sm">
+																			{formatDistanceToNow(new Date(config.rate_limit.request_last_reset), { addSuffix: true })}
+																		</div>
 																	</div>
 																</div>
-															) : null}
+															)}
 
-															{config.rate_limit.token_max_limit == null && config.rate_limit.request_max_limit == null && (
+															{!config.rate_limit.token_max_limit && !config.rate_limit.request_max_limit && (
 																<p className="text-muted-foreground text-sm">No rate limits configured for this provider</p>
 															)}
 														</div>
@@ -294,7 +295,7 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 
 						<div className="space-y-3">
 							{!virtualKey.mcp_configs || virtualKey.mcp_configs.length === 0 ? (
-								<span className="text-muted-foreground text-sm">No MCP clients configured (deny-by-default)</span>
+								<span className="text-muted-foreground text-sm">All MCP clients allowed with default settings</span>
 							) : (
 								<div className="rounded-md border">
 									<Table>
@@ -310,9 +311,7 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 													<TableCell>{config.mcp_client?.name || "Unknown Client"}</TableCell>
 													<TableCell>
 														{config.tools_to_execute?.includes("*") ? (
-															<Badge variant="success" className="text-xs">
-																All Tools
-															</Badge>
+															<span className="text-muted-foreground text-sm">All tools allowed</span>
 														) : config.tools_to_execute && config.tools_to_execute.length > 0 ? (
 															<div className="flex flex-wrap gap-1">
 																{config.tools_to_execute.map((tool) => (
@@ -322,9 +321,7 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 																))}
 															</div>
 														) : (
-															<Badge variant="destructive" className="text-xs">
-																No tools (deny all)
-															</Badge>
+															<span className="text-muted-foreground text-sm">No tools selected</span>
 														)}
 													</TableCell>
 												</TableRow>
@@ -340,29 +337,38 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 
 					{/* Budget Information */}
 					<div className="space-y-4">
-						<h3 className="font-semibold">
-							Budget Information
-							{isManagedByProfile && managingProfile?.budget_lines?.length ? (
-								<span className="text-muted-foreground ml-2 text-xs font-normal">(from {managingProfile.name})</span>
-							) : null}
-						</h3>
+						<h3 className="font-semibold">Budget Information</h3>
 
-						{displayBudgets && displayBudgets.length > 0 ? (
-							<div className="space-y-4">
-								{displayBudgets.map((b, bIdx) => (
-									<div key={bIdx} className="rounded-lg border p-4 space-y-2">
-										<UsageLine current={b.current_usage} max={b.max_limit} format={formatCurrency} />
-										<div className="text-muted-foreground flex items-center justify-between text-xs">
-											<span>
-												Resets {parseResetPeriod(b.reset_duration)}
-												{virtualKey.calendar_aligned && " (calendar)"}
+						{virtualKey.budget ? (
+							<div className="space-y-3">
+								<div className="grid grid-cols-3 items-center gap-4">
+									<span className="text-muted-foreground text-sm">Usage</span>
+									<div className="col-span-2">
+										<div className="flex items-center gap-2">
+											<span className="font-mono text-sm">
+												{formatCurrency(virtualKey.budget.current_usage)} / {formatCurrency(virtualKey.budget.max_limit)}
 											</span>
-											{b.last_reset ? (
-												<span>Last reset {formatDistanceToNow(new Date(b.last_reset), { addSuffix: true })}</span>
-											) : null}
+											<Badge
+												variant={virtualKey.budget.current_usage >= virtualKey.budget.max_limit ? "destructive" : "default"}
+												className="text-xs"
+											>
+												{Math.round((virtualKey.budget.current_usage / virtualKey.budget.max_limit) * 100)}%
+											</Badge>
 										</div>
 									</div>
-								))}
+								</div>
+
+								<div className="grid grid-cols-3 items-center gap-4">
+									<span className="text-muted-foreground text-sm">Reset Period</span>
+									<div className="col-span-2 text-sm">{parseResetPeriod(virtualKey.budget.reset_duration)}</div>
+								</div>
+
+								<div className="grid grid-cols-3 items-center gap-4">
+									<span className="text-muted-foreground text-sm">Last Reset</span>
+									<div className="col-span-2 text-sm">
+										{formatDistanceToNow(new Date(virtualKey.budget.last_reset), { addSuffix: true })}
+									</div>
+								</div>
 							</div>
 						) : (
 							<p className="text-muted-foreground text-sm">No budget limits configured</p>
@@ -371,52 +377,102 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 
 					{/* Rate Limits */}
 					<div className="space-y-4">
-						<h3 className="font-semibold">
-							Rate Limits
-							{isManagedByProfile && hasApRateLimit ? (
-								<span className="text-muted-foreground ml-2 text-xs font-normal">(from {managingProfile?.name})</span>
-							) : null}
-						</h3>
+						<h3 className="font-semibold">Rate Limits</h3>
 
-						{displayRateLimit ? (
+						{virtualKey.rate_limit ? (
 							<div className="space-y-4">
 								{/* Token Limits */}
-								{displayRateLimit.token_max_limit != null ? (
-									<div className="rounded-lg border p-4 space-y-3">
-										<span className="font-medium">Token Limits</span>
-										<UsageLine
-											current={displayRateLimit.token_current_usage}
-											max={displayRateLimit.token_max_limit}
-											format={(n) => n.toLocaleString()}
-										/>
-										<div className="text-muted-foreground flex items-center justify-between text-xs">
-											<span>Resets {parseResetPeriod(displayRateLimit.token_reset_duration || "")}</span>
-											{displayRateLimit.token_last_reset ? (
-												<span>Last reset {formatDistanceToNow(new Date(displayRateLimit.token_last_reset), { addSuffix: true })}</span>
-											) : null}
+								{virtualKey.rate_limit.token_max_limit && (
+									<div className="rounded-lg border p-4">
+										<div className="mb-3">
+											<span className="font-medium">Token Limits</span>
+										</div>
+
+										<div className="space-y-2">
+											<div className="grid grid-cols-3 items-center gap-4">
+												<span className="text-muted-foreground text-sm">Usage</span>
+												<div className="col-span-2">
+													<div className="flex items-center gap-2">
+														<span className="font-mono text-sm">
+															{virtualKey.rate_limit.token_current_usage} / {virtualKey.rate_limit.token_max_limit}
+														</span>
+														<Badge
+															variant={getUsageVariant(
+																calculateUsagePercentage(virtualKey.rate_limit.token_current_usage, virtualKey.rate_limit.token_max_limit),
+															)}
+															className="text-xs"
+														>
+															{calculateUsagePercentage(virtualKey.rate_limit.token_current_usage, virtualKey.rate_limit.token_max_limit)}%
+														</Badge>
+													</div>
+												</div>
+											</div>
+
+											<div className="grid grid-cols-3 items-center gap-4">
+												<span className="text-muted-foreground text-sm">Reset Period</span>
+												<div className="col-span-2 text-sm">{parseResetPeriod(virtualKey.rate_limit.token_reset_duration || "")}</div>
+											</div>
+
+											<div className="grid grid-cols-3 items-center gap-4">
+												<span className="text-muted-foreground text-sm">Last Reset</span>
+												<div className="col-span-2 text-sm">
+													{formatDistanceToNow(new Date(virtualKey.rate_limit.token_last_reset), { addSuffix: true })}
+												</div>
+											</div>
 										</div>
 									</div>
-								) : null}
+								)}
 
 								{/* Request Limits */}
-								{displayRateLimit.request_max_limit != null ? (
-									<div className="rounded-lg border p-4 space-y-3">
-										<span className="font-medium">Request Limits</span>
-										<UsageLine
-											current={displayRateLimit.request_current_usage}
-											max={displayRateLimit.request_max_limit}
-											format={(n) => n.toLocaleString()}
-										/>
-										<div className="text-muted-foreground flex items-center justify-between text-xs">
-											<span>Resets {parseResetPeriod(displayRateLimit.request_reset_duration || "")}</span>
-											{displayRateLimit.request_last_reset ? (
-												<span>Last reset {formatDistanceToNow(new Date(displayRateLimit.request_last_reset), { addSuffix: true })}</span>
-											) : null}
+								{virtualKey.rate_limit.request_max_limit && (
+									<div className="rounded-lg border p-4">
+										<div className="mb-3">
+											<span className="font-medium">Request Limits</span>
+										</div>
+
+										<div className="space-y-2">
+											<div className="grid grid-cols-3 items-center gap-4">
+												<span className="text-muted-foreground text-sm">Usage</span>
+												<div className="col-span-2">
+													<div className="flex items-center gap-2">
+														<span className="font-mono text-sm">
+															{virtualKey.rate_limit.request_current_usage} / {virtualKey.rate_limit.request_max_limit}
+														</span>
+														<Badge
+															variant={getUsageVariant(
+																calculateUsagePercentage(
+																	virtualKey.rate_limit.request_current_usage,
+																	virtualKey.rate_limit.request_max_limit,
+																),
+															)}
+															className="text-xs"
+														>
+															{calculateUsagePercentage(
+																virtualKey.rate_limit.request_current_usage,
+																virtualKey.rate_limit.request_max_limit,
+															)}
+															%
+														</Badge>
+													</div>
+												</div>
+											</div>
+
+											<div className="grid grid-cols-3 items-center gap-4">
+												<span className="text-muted-foreground text-sm">Reset Period</span>
+												<div className="col-span-2 text-sm">{parseResetPeriod(virtualKey.rate_limit.request_reset_duration || "")}</div>
+											</div>
+
+											<div className="grid grid-cols-3 items-center gap-4">
+												<span className="text-muted-foreground text-sm">Last Reset</span>
+												<div className="col-span-2 text-sm">
+													{formatDistanceToNow(new Date(virtualKey.rate_limit.request_last_reset), { addSuffix: true })}
+												</div>
+											</div>
 										</div>
 									</div>
-								) : null}
+								)}
 
-								{displayRateLimit.token_max_limit == null && displayRateLimit.request_max_limit == null && (
+								{!virtualKey.rate_limit.token_max_limit && !virtualKey.rate_limit.request_max_limit && (
 									<p className="text-muted-foreground text-sm">No rate limits configured</p>
 								)}
 							</div>

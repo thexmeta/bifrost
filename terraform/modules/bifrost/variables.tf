@@ -101,11 +101,10 @@ variable "cluster_config" {
   default     = null
 }
 
-variable "scim_config" {
-  description = "SCIM/SSO configuration (enabled, provider: okta/entra, config)."
+variable "saml_config" {
+  description = "SAML/SSO configuration (enabled, provider: okta/entra, config)."
   type        = any
   default     = null
-  sensitive   = true
 }
 
 variable "load_balancer_config" {

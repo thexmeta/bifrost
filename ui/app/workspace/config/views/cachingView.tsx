@@ -1,3 +1,5 @@
+"use client";
+
 import { getErrorMessage, useGetCoreConfigQuery } from "@/lib/store";
 import PluginsForm from "./pluginsForm";
 

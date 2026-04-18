@@ -1,3 +1,5 @@
+"use client";
+
 import FormFooter from "@/components/formFooter";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,14 +39,14 @@ interface TeamDialogProps {
 interface TeamFormData {
 	name: string;
 	customerId: string;
-	// Budget
-	budgetMaxLimit: number | undefined;
+	// Budget (stored as string to allow intermediate decimal states like "1.")
+	budgetMaxLimit: string;
 	budgetResetDuration: string;
 	budgetCalendarAligned: boolean;
 	// Rate Limit
-	tokenMaxLimit: number | undefined;
+	tokenMaxLimit: string;
 	tokenResetDuration: string;
-	requestMaxLimit: number | undefined;
+	requestMaxLimit: string;
 	requestResetDuration: string;
 	isDirty: boolean;
 }
@@ -54,14 +56,14 @@ const createInitialState = (team?: Team | null): Omit<TeamFormData, "isDirty"> =
 	return {
 		name: team?.name || "",
 		customerId: team?.customer_id || "",
-		// Budget
-		budgetMaxLimit: team?.budget?.max_limit ?? undefined,
+		// Budget (stored as string)
+		budgetMaxLimit: team?.budget ? String(team.budget.max_limit) : "",
 		budgetResetDuration: team?.budget?.reset_duration || "1M",
 		budgetCalendarAligned: team?.budget?.calendar_aligned ?? false,
-		// Rate Limit
-		tokenMaxLimit: team?.rate_limit?.token_max_limit ?? undefined,
+		// Rate Limit (stored as string)
+		tokenMaxLimit: team?.rate_limit?.token_max_limit ? String(team.rate_limit.token_max_limit) : "",
 		tokenResetDuration: team?.rate_limit?.token_reset_duration || "1h",
-		requestMaxLimit: team?.rate_limit?.request_max_limit ?? undefined,
+		requestMaxLimit: team?.rate_limit?.request_max_limit ? String(team.rate_limit.request_max_limit) : "",
 		requestResetDuration: team?.rate_limit?.request_reset_duration || "1h",
 	};
 };
@@ -123,10 +125,10 @@ export default function TeamDialog({ team, customers, onSave, onCancel }: TeamDi
 		initialState,
 	]);
 
-	// Values for validation and submission (already numbers)
-	const budgetMaxLimitNum = formData.budgetMaxLimit;
-	const tokenMaxLimitNum = formData.tokenMaxLimit;
-	const requestMaxLimitNum = formData.requestMaxLimit;
+	// Parse string values to numbers for validation and submission
+	const budgetMaxLimitNum = formData.budgetMaxLimit ? parseFloat(formData.budgetMaxLimit) : undefined;
+	const tokenMaxLimitNum = formData.tokenMaxLimit ? parseInt(formData.tokenMaxLimit) : undefined;
+	const requestMaxLimitNum = formData.requestMaxLimit ? parseInt(formData.requestMaxLimit) : undefined;
 
 	// Validation
 	const validator = useMemo(
@@ -187,7 +189,7 @@ export default function TeamDialog({ team, customers, onSave, onCancel }: TeamDi
 
 				// Detect budget changes using had/has pattern
 				const hadBudget = !!team.budget;
-				const hasBudget = budgetMaxLimitNum !== undefined && budgetMaxLimitNum !== null;
+				const hasBudget = !!budgetMaxLimitNum;
 				if (hasBudget) {
 					updateData.budget = {
 						max_limit: budgetMaxLimitNum,
@@ -200,16 +202,13 @@ export default function TeamDialog({ team, customers, onSave, onCancel }: TeamDi
 
 				// Detect rate limit changes using had/has pattern
 				const hadRateLimit = !!team.rate_limit;
-				const hasRateLimit =
-					(tokenMaxLimitNum !== undefined && tokenMaxLimitNum !== null) ||
-					(requestMaxLimitNum !== undefined && requestMaxLimitNum !== null);
+				const hasRateLimit = !!tokenMaxLimitNum || !!requestMaxLimitNum;
 				if (hasRateLimit) {
 					updateData.rate_limit = {
 						token_max_limit: tokenMaxLimitNum,
-						token_reset_duration: tokenMaxLimitNum !== undefined && tokenMaxLimitNum !== null ? formData.tokenResetDuration : undefined,
+						token_reset_duration: tokenMaxLimitNum ? formData.tokenResetDuration : undefined,
 						request_max_limit: requestMaxLimitNum,
-						request_reset_duration:
-							requestMaxLimitNum !== undefined && requestMaxLimitNum !== null ? formData.requestResetDuration : undefined,
+						request_reset_duration: requestMaxLimitNum ? formData.requestResetDuration : undefined,
 					};
 				} else if (hadRateLimit) {
 					updateData.rate_limit = {} as UpdateTeamRequest["rate_limit"];
@@ -225,7 +224,7 @@ export default function TeamDialog({ team, customers, onSave, onCancel }: TeamDi
 				};
 
 				// Add budget if enabled
-				if (budgetMaxLimitNum !== undefined && budgetMaxLimitNum !== null) {
+				if (budgetMaxLimitNum) {
 					createData.budget = {
 						max_limit: budgetMaxLimitNum,
 						reset_duration: formData.budgetResetDuration,
@@ -234,16 +233,12 @@ export default function TeamDialog({ team, customers, onSave, onCancel }: TeamDi
 				}
 
 				// Add rate limit if enabled (token or request limits)
-				if (
-					(tokenMaxLimitNum !== undefined && tokenMaxLimitNum !== null) ||
-					(requestMaxLimitNum !== undefined && requestMaxLimitNum !== null)
-				) {
+				if (tokenMaxLimitNum || requestMaxLimitNum) {
 					createData.rate_limit = {
 						token_max_limit: tokenMaxLimitNum,
-						token_reset_duration: tokenMaxLimitNum !== undefined && tokenMaxLimitNum !== null ? formData.tokenResetDuration : undefined,
+						token_reset_duration: tokenMaxLimitNum ? formData.tokenResetDuration : undefined,
 						request_max_limit: requestMaxLimitNum,
-						request_reset_duration:
-							requestMaxLimitNum !== undefined && requestMaxLimitNum !== null ? formData.requestResetDuration : undefined,
+						request_reset_duration: requestMaxLimitNum ? formData.requestResetDuration : undefined,
 					};
 				}
 
@@ -365,8 +360,8 @@ export default function TeamDialog({ team, customers, onSave, onCancel }: TeamDi
 													: formData.budgetResetDuration === "1Y"
 														? "year"
 														: "period"}
-										. The usage reset to $0.00 cannot be undone, but calendar alignment can be turned off later. This will take effect when
-										you save.
+										. The usage reset to $0.00 cannot be undone, but calendar alignment can be turned off later.
+										This will take effect when you save.
 									</AlertDialogDescription>
 								</AlertDialogHeader>
 								<AlertDialogFooter>

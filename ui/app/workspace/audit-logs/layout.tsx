@@ -1,16 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { NoPermissionView } from "@/components/noPermissionView";
-import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import AuditLogsPage from "./page";
+"use client"
 
-function RouteComponent() {
-	const hasAuditLogsAccess = useRbac(RbacResource.AuditLogs, RbacOperation.View);
-	if (!hasAuditLogsAccess) {
-		return <NoPermissionView entity="audit logs" />;
-	}
-	return <AuditLogsPage />;
+import { NoPermissionView } from "@/components/noPermissionView"
+import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib"
+
+export default function AuditLogsLayout({ children }: { children: React.ReactNode }) {
+  const hasAuditLogsAccess = useRbac(RbacResource.AuditLogs, RbacOperation.View)
+  if (!hasAuditLogsAccess) {
+    return <NoPermissionView entity="audit logs" />
+  }
+  return <div>{children}</div>
 }
-
-export const Route = createFileRoute("/workspace/audit-logs")({
-	component: RouteComponent,
-});

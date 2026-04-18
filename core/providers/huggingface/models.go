@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	schemas "github.com/maximhq/bifrost/core/schemas"
 )
 
@@ -14,7 +13,7 @@ const (
 	maxModelFetchLimit     = 1000
 )
 
-func (response *HuggingFaceListModelsResponse) ToBifrostListModelsResponse(providerKey schemas.ModelProvider, inferenceProvider inferenceProvider, allowedModels schemas.WhiteList, blacklistedModels schemas.BlackList, aliases map[string]string, unfiltered bool) *schemas.BifrostListModelsResponse {
+func (response *HuggingFaceListModelsResponse) ToBifrostListModelsResponse(providerKey schemas.ModelProvider, inferenceProvider inferenceProvider, allowedModels []string, blacklistedModels []string, unfiltered bool) *schemas.BifrostListModelsResponse {
 	if response == nil {
 		return nil
 	}
@@ -23,20 +22,15 @@ func (response *HuggingFaceListModelsResponse) ToBifrostListModelsResponse(provi
 		Data: make([]schemas.Model, 0, len(response.Models)),
 	}
 
-	pipeline := &providerUtils.ListModelsPipeline{
-		AllowedModels:     allowedModels,
-		BlacklistedModels: blacklistedModels,
-		Aliases:           aliases,
-		Unfiltered:        unfiltered,
-		ProviderKey:       providerKey,
-		MatchFns:          providerUtils.DefaultMatchFns(),
-	}
-	if pipeline.ShouldEarlyExit() {
-		return bifrostResponse
+	var blacklisted map[string]struct{}
+	if !unfiltered && len(blacklistedModels) > 0 {
+		blacklisted = make(map[string]struct{}, len(blacklistedModels))
+		for _, m := range blacklistedModels {
+			blacklisted[m] = struct{}{}
+		}
 	}
 
-	included := make(map[string]bool)
-
+	includedModels := make(map[string]bool)
 	for _, model := range response.Models {
 		if model.ModelID == "" {
 			continue
@@ -47,31 +41,37 @@ func (response *HuggingFaceListModelsResponse) ToBifrostListModelsResponse(provi
 			continue
 		}
 
-		// Aliases apply at the model level (model.ModelID), not at the compound
-		// "{providerKey}/{inferenceProvider}/{modelID}" level.
-		for _, result := range pipeline.FilterModel(model.ModelID) {
-			newModel := schemas.Model{
-				// inferenceProvider stays in the compound ID; aliases rename only the model segment
-				ID:               fmt.Sprintf("%s/%s/%s", providerKey, inferenceProvider, result.ResolvedID),
-				Name:             schemas.Ptr(model.ModelID),
-				SupportedMethods: supported,
-				HuggingFaceID:    schemas.Ptr(model.ID),
-			}
-			if result.AliasValue != "" {
-				newModel.Alias = schemas.Ptr(result.AliasValue)
-			}
-			bifrostResponse.Data = append(bifrostResponse.Data, newModel)
-			included[strings.ToLower(result.ResolvedID)] = true
+		if !unfiltered && len(allowedModels) > 0 && !slices.Contains(allowedModels, model.ModelID) {
+			continue
 		}
+		if _, ok := blacklisted[model.ModelID]; ok {
+			continue
+		}
+
+		newModel := schemas.Model{
+			ID:               fmt.Sprintf("%s/%s/%s", providerKey, inferenceProvider, model.ModelID),
+			Name:             schemas.Ptr(model.ModelID),
+			SupportedMethods: supported,
+			HuggingFaceID:    schemas.Ptr(model.ID),
+		}
+
+		bifrostResponse.Data = append(bifrostResponse.Data, newModel)
+		includedModels[model.ModelID] = true
 	}
 
-	// Backfill: use standard pipeline. Note that backfilled HF entries use a simplified
-	// compound ID since we don't know which inferenceProvider to assign them to.
-	for _, m := range pipeline.BackfillModels(included) {
-		// Re-wrap the backfill ID to include the inferenceProvider segment
-		rawID := strings.TrimPrefix(m.ID, string(providerKey)+"/")
-		m.ID = fmt.Sprintf("%s/%s/%s", providerKey, inferenceProvider, rawID)
-		bifrostResponse.Data = append(bifrostResponse.Data, m)
+	// Backfill allowed models that were not in the response
+	if !unfiltered && len(allowedModels) > 0 {
+		for _, allowedModel := range allowedModels {
+			if _, ok := blacklisted[allowedModel]; ok {
+				continue
+			}
+			if !includedModels[allowedModel] {
+				bifrostResponse.Data = append(bifrostResponse.Data, schemas.Model{
+					ID:   fmt.Sprintf("%s/%s/%s", providerKey, inferenceProvider, allowedModel),
+					Name: schemas.Ptr(allowedModel),
+				})
+			}
+		}
 	}
 
 	return bifrostResponse

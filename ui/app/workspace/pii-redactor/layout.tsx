@@ -1,17 +1,12 @@
-import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
+"use client";
+
 import { NoPermissionView } from "@/components/noPermissionView";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import PiiRedactorPage from "./page";
 
-function RouteComponent() {
+export default function PiiRedactorLayout({ children }: { children: React.ReactNode }) {
 	const hasPiiRedactorAccess = useRbac(RbacResource.PIIRedactor, RbacOperation.View);
-	const childMatches = useChildMatches();
 	if (!hasPiiRedactorAccess) {
 		return <NoPermissionView entity="PII redactor" />;
 	}
-	return childMatches.length === 0 ? <PiiRedactorPage /> : <Outlet />;
+	return <div>{children}</div>;
 }
-
-export const Route = createFileRoute("/workspace/pii-redactor")({
-	component: RouteComponent,
-});

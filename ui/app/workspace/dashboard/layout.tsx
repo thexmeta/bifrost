@@ -1,16 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { NoPermissionView } from "@/components/noPermissionView";
-import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import DashboardPage from "./page";
+"use client"
 
-function RouteComponent() {
-	const hasObservabilityAccess = useRbac(RbacResource.Observability, RbacOperation.View);
-	if (!hasObservabilityAccess) {
-		return <NoPermissionView entity="dashboard" />;
-	}
-	return <DashboardPage />;
+import { NoPermissionView } from "@/components/noPermissionView"
+import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib"
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const hasObservabilityAccess = useRbac(RbacResource.Observability, RbacOperation.View)
+  if (!hasObservabilityAccess) {
+    return <NoPermissionView entity="dashboard" />;
+  }
+  return <div>{children}</div>
 }
-
-export const Route = createFileRoute("/workspace/dashboard")({
-	component: RouteComponent,
-});

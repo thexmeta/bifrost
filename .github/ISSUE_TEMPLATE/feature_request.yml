@@ -53,7 +53,7 @@ body:
         - Framework
         - Transports (HTTP)
         - Plugins
-        - UI (React)
+        - UI (Next.js)
         - Docs
     validations:
       required: true

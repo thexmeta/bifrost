@@ -101,12 +101,12 @@ func (provider *PerplexityProvider) completeRequest(ctx *schemas.BifrostContext,
 	// Handle error response
 	if resp.StatusCode() != fasthttp.StatusOK {
 		provider.logger.Debug(fmt.Sprintf("error from %s provider: %s", provider.GetProviderKey(), string(resp.Body())))
-		return nil, latency, providerResponseHeaders, openai.ParseOpenAIError(resp)
+		return nil, latency, providerResponseHeaders, openai.ParseOpenAIError(resp, schemas.ChatCompletionRequest, provider.GetProviderKey(), model)
 	}
 
 	body, err := providerUtils.CheckAndDecodeBody(resp)
 	if err != nil {
-		return nil, latency, providerResponseHeaders, providerUtils.NewBifrostOperationError(schemas.ErrProviderResponseDecode, err)
+		return nil, latency, providerResponseHeaders, providerUtils.NewBifrostOperationError(schemas.ErrProviderResponseDecode, err, provider.GetProviderKey())
 	}
 
 	// Read the response body and copy it before releasing the response
@@ -141,7 +141,8 @@ func (provider *PerplexityProvider) ChatCompletion(ctx *schemas.BifrostContext, 
 		request,
 		func() (providerUtils.RequestBodyWithExtraParams, error) {
 			return ToPerplexityChatCompletionRequest(request), nil
-		})
+		},
+		provider.GetProviderKey())
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +161,9 @@ func (provider *PerplexityProvider) ChatCompletion(ctx *schemas.BifrostContext, 
 	bifrostResponse := response.ToBifrostChatResponse(request.Model)
 
 	// Set ExtraFields
+	bifrostResponse.ExtraFields.Provider = provider.GetProviderKey()
+	bifrostResponse.ExtraFields.ModelRequested = request.Model
+	bifrostResponse.ExtraFields.RequestType = schemas.ChatCompletionRequest
 	bifrostResponse.ExtraFields.Latency = latency.Milliseconds()
 	bifrostResponse.ExtraFields.ProviderResponseHeaders = providerResponseHeaders
 
@@ -219,6 +223,9 @@ func (provider *PerplexityProvider) Responses(ctx *schemas.BifrostContext, key s
 	}
 
 	response := chatResponse.ToBifrostResponsesResponse()
+	response.ExtraFields.RequestType = schemas.ResponsesRequest
+	response.ExtraFields.Provider = provider.GetProviderKey()
+	response.ExtraFields.ModelRequested = request.Model
 
 	return response, nil
 }

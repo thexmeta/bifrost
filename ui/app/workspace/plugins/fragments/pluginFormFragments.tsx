@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/codeEditor";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";

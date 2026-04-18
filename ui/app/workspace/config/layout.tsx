@@ -1,26 +1,21 @@
-import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
-import FullPageLoader from "@/components/fullPageLoader";
-import { NoPermissionView } from "@/components/noPermissionView";
-import { useGetCoreConfigQuery } from "@/lib/store";
-import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import ConfigPage from "./page";
+"use client"
 
-function RouteComponent() {
-	const hasConfigAccess = useRbac(RbacResource.Settings, RbacOperation.View);
-	const { isLoading } = useGetCoreConfigQuery({ fromDB: true }, { skip: !hasConfigAccess });
-	const childMatches = useChildMatches();
+import FullPageLoader from "@/components/fullPageLoader"
+import { NoPermissionView } from "@/components/noPermissionView"
+import { useGetCoreConfigQuery } from "@/lib/store"
+import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib"
 
-	if (!hasConfigAccess) {
-		return <NoPermissionView entity="configuration" />;
-	}
+export default function ConfigLayout({ children }: { children: React.ReactNode }) {
+  const hasConfigAccess = useRbac(RbacResource.Settings, RbacOperation.View)
+  const { isLoading } = useGetCoreConfigQuery({ fromDB: true })
 
-	if (isLoading) {
-		return <FullPageLoader />;
-	}
+  if (!hasConfigAccess) {
+    return <NoPermissionView entity="configuration" />
+  }
 
-	return childMatches.length === 0 ? <ConfigPage /> : <Outlet />;
+  if (isLoading) {
+    return <FullPageLoader />
+  }
+
+  return <div>{children}</div>
 }
-
-export const Route = createFileRoute("/workspace/config")({
-	component: RouteComponent,
-});

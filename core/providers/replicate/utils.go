@@ -31,13 +31,17 @@ func checkForErrorStatus(prediction *ReplicatePredictionResponse) *schemas.Bifro
 		}
 		return providerUtils.NewBifrostOperationError(
 			"prediction failed",
-			fmt.Errorf("%s", errorMsg))
+			fmt.Errorf("%s", errorMsg),
+			schemas.Replicate,
+		)
 	}
 
 	if prediction.Status == ReplicatePredictionStatusCanceled {
 		return providerUtils.NewBifrostOperationError(
 			"prediction was canceled",
-			fmt.Errorf("prediction was canceled"))
+			fmt.Errorf("prediction was canceled"),
+			schemas.Replicate,
+		)
 	}
 
 	return nil
@@ -122,9 +126,9 @@ func listenToReplicateStreamURL(
 			}
 		}
 		if errors.Is(err, fasthttp.ErrTimeout) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, nil, providerUtils.NewBifrostTimeoutError(schemas.ErrProviderRequestTimedOut, err)
+			return nil, nil, providerUtils.NewBifrostTimeoutError(schemas.ErrProviderRequestTimedOut, err, schemas.Replicate)
 		}
-		return nil, nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderDoRequest, err)
+		return nil, nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderDoRequest, err, schemas.Replicate)
 	}
 
 	// Extract provider response headers before status check so error responses also forward them
@@ -174,12 +178,24 @@ func isVersionID(s string) bool {
 	return versionIDPattern.MatchString(s)
 }
 
+// resolveDeploymentModel checks if the model maps to a deployment.
+// Returns the resolved model and whether it is a deployment.
+func resolveDeploymentModel(model string, key schemas.Key) (string, bool) {
+	if key.ReplicateKeyConfig == nil || key.ReplicateKeyConfig.Deployments == nil {
+		return model, false
+	}
+	if deployment, ok := key.ReplicateKeyConfig.Deployments[model]; ok && deployment != "" {
+		return deployment, true
+	}
+	return model, false
+}
+
 // buildPredictionURL builds the appropriate URL for creating a prediction
 // Returns the URL for the appropriate prediction endpoint.
-func buildPredictionURL(ctx *schemas.BifrostContext, baseURL, model string, customProviderConfig *schemas.CustomProviderConfig, requestType schemas.RequestType, useDeploymentsEndpoint bool) string {
+func buildPredictionURL(ctx *schemas.BifrostContext, baseURL, model string, customProviderConfig *schemas.CustomProviderConfig, requestType schemas.RequestType, isDeployment bool) string {
 	var defaultPath string
 
-	if useDeploymentsEndpoint {
+	if isDeployment {
 		defaultPath = "/v1/deployments/" + model + "/predictions"
 	} else if isVersionID(model) {
 		// If model is a version ID, use base predictions endpoint

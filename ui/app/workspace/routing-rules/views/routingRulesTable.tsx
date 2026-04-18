@@ -3,6 +3,20 @@
  * Displays all routing rules with CRUD actions
  */
 
+"use client";
+
+import { RoutingRule } from "@/lib/types/routingRules";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,26 +27,21 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alertDialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ChevronLeft, ChevronRight, Edit, Search, Trash2 } from "lucide-react";
+import { truncateCELExpression, getScopeLabel, getPriorityBadgeClass } from "@/lib/utils/routingRules";
+import { useState } from "react";
+import { useDeleteRoutingRuleMutation } from "@/lib/store/apis/routingRulesApi";
+import { toast } from "sonner";
 import { ProviderIconType, RenderProviderIcon } from "@/lib/constants/icons";
 import { getProviderLabel } from "@/lib/constants/logs";
 import { getErrorMessage } from "@/lib/store";
-import { useDeleteRoutingRuleMutation } from "@/lib/store/apis/routingRulesApi";
-import { RoutingRule, RoutingTarget } from "@/lib/types/routingRules";
-import { getPriorityBadgeClass, getScopeLabel, truncateCELExpression } from "@/lib/utils/routingRules";
-import { ChevronLeft, ChevronRight, Edit, Search, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { RoutingTarget } from "@/lib/types/routingRules";
 
 interface RoutingRulesTableProps {
 	rules: RoutingRule[] | undefined;
 	totalCount: number;
 	isLoading: boolean;
 	onEdit: (rule: RoutingRule) => void;
-	onRowClick: (rule: RoutingRule) => void;
 	/** When false, delete button is hidden and deletion is disabled (e.g. for read-only users). */
 	canDelete?: boolean;
 	search: string;
@@ -42,19 +51,7 @@ interface RoutingRulesTableProps {
 	onOffsetChange: (offset: number) => void;
 }
 
-export function RoutingRulesTable({
-	rules,
-	totalCount,
-	isLoading,
-	onEdit,
-	onRowClick,
-	canDelete = false,
-	search,
-	onSearchChange,
-	offset,
-	limit,
-	onOffsetChange,
-}: RoutingRulesTableProps) {
+export function RoutingRulesTable({ rules, totalCount, isLoading, onEdit, canDelete = false, search, onSearchChange, offset, limit, onOffsetChange }: RoutingRulesTableProps) {
 	const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
 	const [deleteRoutingRule, { isLoading: isDeleting }] = useDeleteRoutingRuleMutation();
 
@@ -89,7 +86,7 @@ export function RoutingRulesTable({
 						{[...Array(5)].map((_, i) => (
 							<TableRow key={i}>
 								<TableCell colSpan={7} className="h-10">
-									<div className="bg-muted h-2 w-32 animate-pulse rounded" />
+									<div className="h-2 w-32 bg-muted rounded animate-pulse" />
 								</TableCell>
 							</TableRow>
 						))}
@@ -107,7 +104,7 @@ export function RoutingRulesTable({
 			{/* Toolbar: Search */}
 			<div className="flex items-center gap-3">
 				<div className="relative max-w-sm flex-1">
-					<Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+					<Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
 					<Input
 						aria-label="Search routing rules by name"
 						placeholder="Search by name..."
@@ -119,7 +116,7 @@ export function RoutingRulesTable({
 				</div>
 			</div>
 
-			<div className="overflow-hidden rounded-sm border">
+			<div className="rounded-sm border overflow-hidden">
 				<Table>
 					<TableHeader>
 						<TableRow className="bg-muted/50">
@@ -140,61 +137,57 @@ export function RoutingRulesTable({
 								</TableCell>
 							</TableRow>
 						) : (
-							sortedRules.map((rule) => (
-								<TableRow key={rule.id} className="hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => onRowClick(rule)}>
-									<TableCell className="font-medium">
-										<div className="flex flex-col gap-1">
-											<span className="max-w-xs truncate">{rule.name}</span>
-											{rule.description && (
-												<span data-testid="routing-rule-description" className="text-muted-foreground max-w-xs truncate text-xs">
-													{rule.description}
-												</span>
-											)}
-										</div>
-									</TableCell>
-									<TableCell>
-										<TargetsSummary targets={rule.targets || []} />
-									</TableCell>
-									<TableCell>
-										<Badge variant="secondary">{getScopeLabel(rule.scope)}</Badge>
-									</TableCell>
-									<TableCell className="text-right">
-										<div className={`inline-block rounded px-2.5 py-1 text-xs font-medium ${getPriorityBadgeClass()}`}>{rule.priority}</div>
-									</TableCell>
-									<TableCell>
-										<span className="text-muted-foreground block max-w-xs truncate font-mono text-xs" title={rule.cel_expression}>
-											{truncateCELExpression(rule.cel_expression)}
-										</span>
-									</TableCell>
-									<TableCell>
-										<Badge variant={rule.enabled ? "default" : "secondary"}>{rule.enabled ? "Enabled" : "Disabled"}</Badge>
-									</TableCell>
-									<TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-										<div className="flex items-center justify-end gap-2">
+						sortedRules.map((rule) => (
+							<TableRow key={rule.id} className="hover:bg-muted/50 cursor-pointer transition-colors">
+								<TableCell className="font-medium">
+									<div className="flex flex-col gap-1">
+										<span className="truncate max-w-xs">{rule.name}</span>
+										{rule.description && (
+											<span data-testid="routing-rule-description" className="text-xs text-muted-foreground truncate max-w-xs">{rule.description}</span>
+										)}
+									</div>
+								</TableCell>
+								<TableCell>
+									<TargetsSummary targets={rule.targets || []} />
+								</TableCell>
+								<TableCell>
+									<Badge variant="secondary">{getScopeLabel(rule.scope)}</Badge>
+								</TableCell>
+								<TableCell className="text-right">
+									<div className={`inline-block px-2.5 py-1 rounded text-xs font-medium ${getPriorityBadgeClass(rule.priority)}`}>
+										{rule.priority}
+									</div>
+								</TableCell>
+								<TableCell>
+									<span className="font-mono text-xs text-muted-foreground truncate max-w-xs block" title={rule.cel_expression}>
+										{truncateCELExpression(rule.cel_expression)}
+									</span>
+								</TableCell>
+								<TableCell>
+									<Badge variant={rule.enabled ? "default" : "secondary"}>
+										{rule.enabled ? "Enabled" : "Disabled"}
+									</Badge>
+								</TableCell>
+								<TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+									<div className="flex items-center justify-end gap-2">
+										<Button variant="ghost" size="sm" onClick={() => onEdit(rule)} aria-label="Edit routing rule">
+											<Edit className="h-4 w-4" />
+										</Button>
+										{canDelete && (
 											<Button
 												variant="ghost"
 												size="sm"
-												onClick={() => onEdit(rule)}
-												aria-label="Edit routing rule"
-												data-testid={`routing-rule-edit-${rule.id}-btn`}
+												className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+												onClick={() => setDeleteRuleId(rule.id)}
+												aria-label="Delete routing rule"
 											>
-												<Edit className="h-4 w-4" />
+												<Trash2 className="h-4 w-4" />
 											</Button>
-											{canDelete && (
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={() => setDeleteRuleId(rule.id)}
-													aria-label="Delete routing rule"
-													data-testid={`routing-rule-delete-${rule.id}-btn`}
-												>
-													<Trash2 className="h-4 w-4" />
-												</Button>
-											)}
-										</div>
-									</TableCell>
-								</TableRow>
-							))
+										)}
+									</div>
+								</TableCell>
+							</TableRow>
+						))
 						)}
 					</TableBody>
 				</Table>
@@ -257,18 +250,28 @@ function TargetsSummary({ targets }: { targets: RoutingTarget[] }) {
 	}
 
 	const first = targets[0];
-	const label = [first.provider ? getProviderLabel(first.provider) : "Any", first.model || "Any model"].join(" / ");
+	const label = [
+		first.provider ? getProviderLabel(first.provider) : "Any",
+		first.model || "Any model",
+	].join(" / ");
 
 	return (
 		<div className="flex flex-col gap-1">
 			<div className="flex items-center gap-1.5">
-				{first.provider && <RenderProviderIcon provider={first.provider as ProviderIconType} size="sm" className="h-4 w-4 shrink-0" />}
-				<span className="max-w-[160px] truncate text-sm">{label}</span>
+				{first.provider && (
+					<RenderProviderIcon
+						provider={first.provider as ProviderIconType}
+						size="sm"
+						className="h-4 w-4 shrink-0"
+					/>
+				)}
+				<span className="text-sm truncate max-w-[160px]">{label}</span>
+				{targets.length === 1 && (
+					<span className="text-xs text-muted-foreground shrink-0">{first.weight}</span>
+				)}
 			</div>
 			{targets.length > 1 && (
-				<span className="text-muted-foreground text-xs">
-					+{targets.length - 1} more target{targets.length > 2 ? "s" : ""}
-				</span>
+				<span className="text-xs text-muted-foreground">+{targets.length - 1} more target{targets.length > 2 ? "s" : ""}</span>
 			)}
 		</div>
 	);

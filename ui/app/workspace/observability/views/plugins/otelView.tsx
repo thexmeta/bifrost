@@ -1,3 +1,5 @@
+"use client";
+
 import { getErrorMessage, useAppSelector, useUpdatePluginMutation } from "@/lib/store";
 import { OtelConfigSchema, OtelFormSchema } from "@/lib/types/schemas";
 import { useMemo } from "react";
@@ -15,7 +17,7 @@ export default function OtelView({ onDelete, isDeleting }: OtelViewProps) {
 		() => ({ ...((selectedPlugin?.config as OtelConfigSchema) ?? {}), enabled: selectedPlugin?.enabled }),
 		[selectedPlugin],
 	);
-	const [updatePlugin] = useUpdatePluginMutation();
+	const [updatePlugin, { isLoading: isUpdatingPlugin }] = useUpdatePluginMutation();
 	const baseUrl = `${window.location.protocol}//${window.location.host}`;
 
 	const handleOtelConfigSave = (config: OtelFormSchema): Promise<void> => {

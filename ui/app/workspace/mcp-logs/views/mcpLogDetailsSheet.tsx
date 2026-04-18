@@ -1,3 +1,5 @@
+"use client";
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -18,7 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Status, StatusColors, Statuses } from "@/lib/constants/logs";
 import type { MCPToolLogEntry } from "@/lib/types/logs";
 import { ChevronDown, ChevronUp, MoreVertical, Trash2 } from "lucide-react";
-import { addMilliseconds, format, isValid } from "date-fns";
+import moment from "moment";
 import { useState, type ReactNode } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
@@ -59,15 +61,7 @@ const getValidatedStatus = (status: string): Status => {
 	return "processing";
 };
 
-export function MCPLogDetailSheet({
-	log,
-	open,
-	onOpenChange,
-	handleDelete,
-	onNavigate,
-	hasPrev = false,
-	hasNext = false,
-}: MCPLogDetailSheetProps) {
+export function MCPLogDetailSheet({ log, open, onOpenChange, handleDelete, onNavigate, hasPrev = false, hasNext = false }: MCPLogDetailSheetProps) {
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
 	// Keyboard navigation: arrow up/down to navigate between logs
@@ -89,26 +83,10 @@ export function MCPLogDetailSheet({
 						</SheetTitle>
 					</div>
 					<div className="flex items-center">
-						<Button
-							variant="ghost"
-							className="size-8"
-							disabled={!hasPrev}
-							onClick={() => onNavigate?.("prev")}
-							aria-label="Previous log"
-							data-testid="mcp-log-nav-prev"
-							type="button"
-						>
+						<Button variant="ghost" className="size-8" disabled={!hasPrev} onClick={() => onNavigate?.("prev")} aria-label="Previous log" data-testid="mcp-log-nav-prev" type="button">
 							<ChevronUp className="size-4" />
 						</Button>
-						<Button
-							variant="ghost"
-							className="size-8"
-							disabled={!hasNext}
-							onClick={() => onNavigate?.("next")}
-							aria-label="Next log"
-							data-testid="mcp-log-nav-next"
-							type="button"
-						>
+						<Button variant="ghost" className="size-8" disabled={!hasNext} onClick={() => onNavigate?.("next")} aria-label="Next log" data-testid="mcp-log-nav-next" type="button">
 							<ChevronDown className="size-4" />
 						</Button>
 					</div>
@@ -162,16 +140,14 @@ export function MCPLogDetailSheet({
 							<LogEntryDetailsView
 								className="w-full"
 								label="Start Timestamp"
-								value={isValid(new Date(log.timestamp)) ? format(new Date(log.timestamp), "yyyy-MM-dd hh:mm:ss aa") : "Invalid date"}
+								value={moment(log.timestamp).format("YYYY-MM-DD HH:mm:ss A")}
 							/>
 							<LogEntryDetailsView
 								className="w-full"
 								label="End Timestamp"
-								value={
-									isValid(new Date(log.timestamp))
-										? format(addMilliseconds(new Date(log.timestamp), log.latency || 0), "yyyy-MM-dd hh:mm:ss aa")
-										: "Invalid date"
-								}
+								value={moment(log.timestamp)
+									.add(log.latency || 0, "ms")
+									.format("YYYY-MM-DD HH:mm:ss A")}
 							/>
 							<LogEntryDetailsView className="w-full" label="Latency" value={log.latency ? `${log.latency.toFixed(2)}ms` : "NA"} />
 						</div>

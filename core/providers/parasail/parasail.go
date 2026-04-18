@@ -145,6 +145,9 @@ func (provider *ParasailProvider) Responses(ctx *schemas.BifrostContext, key sch
 	}
 
 	response := chatResponse.ToBifrostResponsesResponse()
+	response.ExtraFields.RequestType = schemas.ResponsesRequest
+	response.ExtraFields.Provider = provider.GetProviderKey()
+	response.ExtraFields.ModelRequested = request.Model
 
 	return response, nil
 }

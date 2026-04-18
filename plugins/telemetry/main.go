@@ -84,7 +84,6 @@ type PrometheusPlugin struct {
 	CostTotal                      *prometheus.CounterVec
 	StreamInterTokenLatencySeconds *prometheus.HistogramVec
 	StreamFirstTokenLatencySeconds *prometheus.HistogramVec
-	KeyRotationEventsTotal         *prometheus.CounterVec
 	customLabels                   []string
 
 	defaultHTTPLabels    []string
@@ -137,7 +136,6 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 	defaultBifrostLabels := []string{
 		"provider",
 		"model",
-		"alias",
 		"method",
 		"virtual_key_id",
 		"virtual_key_name",
@@ -290,17 +288,6 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 		append(defaultBifrostLabels, filteredCustomLabels...),
 	)
 
-	// bifrostKeyRotationEventsTotal counts individual retry/rotation events from the attempt trail.
-	// One observation is emitted per failed attempt (where fail_reason is non-nil), not per request.
-	// Use this to track rate-limit pressure and network-error frequency per provider/key.
-	bifrostKeyRotationEventsTotal := factory.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "bifrost_key_rotation_events_total",
-			Help: "Number of key retry/rotation events, broken down by provider, key, and failure reason. One increment per failed attempt.",
-		},
-		[]string{"provider", "requested_model", "key_id", "key_name", "fail_reason"},
-	)
-
 	plugin := &PrometheusPlugin{
 		logger:                         logger,
 		pricingManager:                 pricingManager,
@@ -321,7 +308,6 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 		CostTotal:                      bifrostCostTotal,
 		StreamInterTokenLatencySeconds: bifrostStreamInterTokenLatencySeconds,
 		StreamFirstTokenLatencySeconds: bifrostStreamFirstTokenLatencySeconds,
-		KeyRotationEventsTotal:         bifrostKeyRotationEventsTotal,
 		customLabels:                   filteredCustomLabels,
 		defaultHTTPLabels:              defaultHTTPLabels,
 		defaultBifrostLabels:           defaultBifrostLabels,
@@ -373,17 +359,7 @@ func (p *PrometheusPlugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.
 //   - Request latency
 //   - Total request count
 func (p *PrometheusPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
-	requestType, provider, originalModel, resolvedModel := bifrost.GetResponseFields(result, bifrostErr)
-
-	// Determine effective model label and alias label (mirrors applyModelAlias logic in logging)
-	model := originalModel
-	alias := ""
-	if resolvedModel != "" {
-		model = resolvedModel
-		if resolvedModel != originalModel {
-			alias = originalModel
-		}
-	}
+	requestType, provider, model := bifrost.GetResponseFields(result, bifrostErr)
 
 	startTime, ok := ctx.Value(startTimeKey).(time.Time)
 	if !ok {
@@ -401,7 +377,6 @@ func (p *PrometheusPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *sche
 
 	numberOfRetries := bifrost.GetIntFromContext(ctx, schemas.BifrostContextKeyNumberOfRetries)
 	fallbackIndex := bifrost.GetIntFromContext(ctx, schemas.BifrostContextKeyFallbackIndex)
-	attemptTrail, _ := ctx.Value(schemas.BifrostContextKeyAttemptTrail).([]schemas.KeyAttemptRecord)
 	// Get routing engines array and join into comma-separated string
 	routingEngines := []string{}
 	if engines, ok := ctx.Value(schemas.BifrostContextKeyRoutingEnginesUsed).([]string); ok {
@@ -418,7 +393,6 @@ func (p *PrometheusPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *sche
 	labelValues := map[string]string{
 		"provider":            string(provider),
 		"model":               model,
-		"alias":               alias,
 		"method":              string(requestType),
 		"virtual_key_id":      virtualKeyID,
 		"virtual_key_name":    virtualKeyName,
@@ -451,8 +425,6 @@ func (p *PrometheusPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *sche
 	streamEndIndicatorValue := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator)
 	isFinalChunk, hasFinalChunkIndicator := streamEndIndicatorValue.(bool)
 
-	pricingScopes := modelcatalog.PricingLookupScopesFromContext(ctx, string(provider))
-
 	// Calculate cost and record metrics in a separate goroutine to avoid blocking the main thread
 	go func() {
 		// For streaming requests, handle per-token metrics for intermediate chunks
@@ -475,17 +447,7 @@ func (p *PrometheusPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *sche
 
 		cost := 0.0
 		if p.pricingManager != nil && result != nil {
-			cost = p.pricingManager.CalculateCost(result, pricingScopes)
-		}
-
-		// Emit one counter increment per failed attempt in the trail (fail_reason != nil).
-		// This decouples per-attempt retry visibility from the per-request metrics above.
-		for _, record := range attemptTrail {
-			if record.FailReason != nil {
-				p.KeyRotationEventsTotal.WithLabelValues(
-					string(provider), originalModel, record.KeyID, record.KeyName, *record.FailReason,
-				).Inc()
-			}
+			cost = p.pricingManager.CalculateCost(result)
 		}
 
 		p.UpstreamRequestsTotal.WithLabelValues(promLabelValues...).Inc()

@@ -1,14 +1,15 @@
+"use client";
+
 import { ThemeProvider } from "@/components/themeProvider";
 import { ReduxProvider } from "@/lib/store";
 import { isDevelopmentMode } from "@/lib/utils/port";
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { notFound } from "next/navigation";
 import { Toaster } from "sonner";
-import PprofPage from "./page";
 
-function PprofLayout({ children }: { children: React.ReactNode }) {
+export default function PprofLayout({ children }: { children: React.ReactNode }) {
 	// Only allow access in development mode
 	if (!isDevelopmentMode()) {
-		throw notFound();
+		notFound();
 	}
 
 	return (
@@ -20,15 +21,3 @@ function PprofLayout({ children }: { children: React.ReactNode }) {
 		</ThemeProvider>
 	);
 }
-
-function RouteComponent() {
-	return (
-		<PprofLayout>
-			<PprofPage />
-		</PprofLayout>
-	);
-}
-
-export const Route = createFileRoute("/pprof")({
-	component: RouteComponent,
-});

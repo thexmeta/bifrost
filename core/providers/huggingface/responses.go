@@ -43,6 +43,9 @@ func ToBifrostResponsesResponseFromHuggingFace(resp *schemas.BifrostChatResponse
 
 	responsesResp := resp.ToBifrostResponsesResponse()
 	if responsesResp != nil {
+		responsesResp.ExtraFields.Provider = schemas.HuggingFace
+		responsesResp.ExtraFields.ModelRequested = requestedModel
+		responsesResp.ExtraFields.RequestType = schemas.ResponsesRequest
 	}
 
 	return responsesResp, nil

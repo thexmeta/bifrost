@@ -1,5 +1,5 @@
 import { KnownProvidersNames } from "@/lib/constants/logs";
-import { isValidAliases, isValidVertexAuthCredentials } from "@/lib/utils/validation";
+import { isValidDeployments, isValidVertexAuthCredentials } from "@/lib/utils/validation";
 import { z } from "zod";
 
 // Base schemas for reusable types
@@ -68,6 +68,10 @@ const AllowedRequestsSchema = z.object({
 // Key configuration schemas
 const AzureKeyConfigSchema = z.object({
 	endpoint: z.string().min(1, "Endpoint is required for Azure keys"),
+	deployments: z
+		.union([z.record(z.string(), z.string()), z.string()])
+		.optional()
+		.refine((value) => !value || isValidDeployments(value), { message: "Valid Deployments (JSON object) are required for Azure keys" }),
 	api_version: z.string().optional(),
 	client_id: z.string().optional(),
 	client_secret: z.string().optional(),
@@ -84,6 +88,10 @@ const VertexKeyConfigSchema = z.object({
 		.refine((value) => !value || isValidVertexAuthCredentials(value), {
 			message: "Auth Credentials must be a valid JSON object or env.VAR format when provided",
 		}),
+	deployments: z
+		.union([z.record(z.string(), z.string()), z.string()])
+		.optional()
+		.refine((value) => !value || isValidDeployments(value), { message: "Valid Deployments (JSON object) are required for Vertex AI keys" }),
 });
 
 // S3 bucket configuration for Bedrock batch operations
@@ -107,6 +115,12 @@ const BedrockKeyConfigSchema = z
 		external_id: z.string().optional(),
 		session_name: z.string().optional(),
 		arn: z.string().optional(),
+		deployments: z
+			.union([z.record(z.string(), z.string()), z.string()])
+			.optional()
+			.refine((value) => !value || Object.keys(value).length === 0 || isValidDeployments(value), {
+				message: "Valid Deployments (JSON object) are required for Bedrock keys",
+			}),
 		batch_s3_config: BatchS3ConfigSchema.optional(),
 	})
 	.refine(
@@ -136,7 +150,10 @@ const BedrockKeyConfigSchema = z
 	);
 
 const ReplicateKeyConfigSchema = z.object({
-	use_deployments_endpoint: z.boolean(),
+	deployments: z
+		.union([z.record(z.string(), z.string()), z.string()])
+		.optional()
+		.refine((value) => !value || isValidDeployments(value), { message: "Valid Deployments (JSON object) are required for Replicate keys" }),
 });
 
 const KeySchema = z.object({
@@ -145,10 +162,6 @@ const KeySchema = z.object({
 	value: z.string(),
 	models: z.array(z.string()),
 	weight: z.number().min(0.1, "Key weights must be between 0.1 and 1").max(1, "Key weights must be between 0.1 and 1"),
-	aliases: z
-		.union([z.record(z.string(), z.string()), z.string()])
-		.optional()
-		.refine((value) => !value || isValidAliases(value), { message: "Aliases must be a valid JSON object" }),
 	azure_key_config: AzureKeyConfigSchema.optional(),
 	vertex_key_config: VertexKeyConfigSchema.optional(),
 	bedrock_key_config: BedrockKeyConfigSchema.optional(),
@@ -213,7 +226,7 @@ export const ProviderFormSchema = z
 		}
 
 		// Base URL validation for specific providers
-		const baseURLRequired = isCustomProvider;
+		const baseURLRequired = data.selectedProvider === "ollama" || data.selectedProvider === "sgl" || isCustomProvider;
 		if (baseURLRequired) {
 			if (!data.networkConfig?.base_url) {
 				ctx.addIssue({

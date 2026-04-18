@@ -12,16 +12,13 @@ import (
 
 // IntegrationHandler manages HTTP requests for AI provider integrations
 type IntegrationHandler struct {
-	extensions            []integrations.ExtensionRouter
-	wsResponses           *WSResponsesHandler
-	wsRealtime            *WSRealtimeHandler
-	webrtcRealtime        *WebRTCRealtimeHandler
-	realtimeClientSecrets *RealtimeClientSecretsHandler
+	extensions  []integrations.ExtensionRouter
+	wsResponses *WSResponsesHandler
 }
 
 // NewIntegrationHandler creates a new integration handler instance.
-// WebSocket handlers may be nil if WebSocket support is not configured.
-func NewIntegrationHandler(client *bifrost.Bifrost, handlerStore lib.HandlerStore, wsResponses *WSResponsesHandler, wsRealtime *WSRealtimeHandler, webrtcRealtime *WebRTCRealtimeHandler, realtimeClientSecrets *RealtimeClientSecretsHandler) *IntegrationHandler {
+// wsResponses may be nil if WebSocket support is not configured.
+func NewIntegrationHandler(client *bifrost.Bifrost, handlerStore lib.HandlerStore, wsResponses *WSResponsesHandler) *IntegrationHandler {
 	// Initialize all available integration routers
 	extensions := []integrations.ExtensionRouter{
 		integrations.NewOpenAIRouter(client, handlerStore, logger),
@@ -41,11 +38,8 @@ func NewIntegrationHandler(client *bifrost.Bifrost, handlerStore lib.HandlerStor
 	}
 
 	return &IntegrationHandler{
-		extensions:            extensions,
-		wsResponses:           wsResponses,
-		wsRealtime:            wsRealtime,
-		webrtcRealtime:        webrtcRealtime,
-		realtimeClientSecrets: realtimeClientSecrets,
+		extensions:  extensions,
+		wsResponses: wsResponses,
 	}
 }
 
@@ -58,30 +52,6 @@ func (h *IntegrationHandler) RegisterRoutes(r *router.Router, middlewares ...sch
 	// Register WebSocket routes (base path + integration paths)
 	if h.wsResponses != nil {
 		h.wsResponses.RegisterRoutes(r, middlewares...)
-	}
-	if h.wsRealtime != nil {
-		h.wsRealtime.RegisterRoutes(r, middlewares...)
-	}
-	if h.webrtcRealtime != nil {
-		h.webrtcRealtime.RegisterRoutes(r, middlewares...)
-	}
-	if h.realtimeClientSecrets != nil {
-		h.realtimeClientSecrets.RegisterRoutes(r, middlewares...)
-	}
-}
-
-func (h *IntegrationHandler) Close() {
-	if h == nil {
-		return
-	}
-	if h.wsResponses != nil {
-		h.wsResponses.Close()
-	}
-	if h.wsRealtime != nil {
-		h.wsRealtime.Close()
-	}
-	if h.webrtcRealtime != nil {
-		h.webrtcRealtime.Close()
 	}
 }
 

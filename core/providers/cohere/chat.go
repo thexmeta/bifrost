@@ -372,6 +372,8 @@ func (response *CohereChatResponse) ToBifrostChatResponse(model string) *schemas
 		},
 		Created: int(time.Now().Unix()),
 		ExtraFields: schemas.BifrostResponseExtraFields{
+			RequestType: schemas.ChatCompletionRequest,
+			Provider:    schemas.Cohere,
 		},
 	}
 

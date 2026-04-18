@@ -42,6 +42,7 @@ func TestToVertexRankRequest(t *testing.T) {
 				TopN: schemas.Ptr(10),
 			},
 		},
+		"semantic-ranker-default@latest",
 		&vertexRerankOptions{
 			RankingConfig:                 "projects/p/locations/global/rankingConfigs/default_ranking_config",
 			IgnoreRecordDetailsInResponse: true,
@@ -76,6 +77,7 @@ func TestToVertexRankRequestTooManyRecords(t *testing.T) {
 			Query:     "q",
 			Documents: docs,
 		},
+		"",
 		&vertexRerankOptions{
 			RankingConfig:                 "projects/p/locations/global/rankingConfigs/default_ranking_config",
 			IgnoreRecordDetailsInResponse: true,

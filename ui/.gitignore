@@ -13,7 +13,7 @@
 # testing
 /coverage
 
-# build output
+# next.js
 /.next/
 /out/
 
@@ -38,6 +38,4 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-
-# auto-generated TanStack Router route tree
-/app/routeTree.gen.ts
+next-env.d.ts

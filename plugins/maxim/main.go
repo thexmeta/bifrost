@@ -119,11 +119,10 @@ func convertAccResultToProcessedStreamResponse(accResult *schemas.StreamAccumula
 		streamType = streaming.StreamTypeImage
 	}
 	return &streaming.ProcessedStreamResponse{
-		RequestID:      accResult.RequestID,
-		StreamType:     streamType,
-		RequestedModel: accResult.RequestedModel,
-		ResolvedModel:  accResult.ResolvedModel,
-		Provider:       accResult.Provider,
+		RequestID:  accResult.RequestID,
+		StreamType: streamType,
+		Model:      accResult.Model,
+		Provider:   accResult.Provider,
 		Data: &streaming.AccumulatedData{
 			Status:              accResult.Status,
 			Latency:             accResult.Latency,
@@ -247,10 +246,6 @@ func (plugin *Plugin) getOrCreateLogger(logRepoID string) (*logging.Logger, erro
 //   - *schemas.BifrostRequest: The original request, unmodified
 //   - error: Any error that occurred during trace/generation creation
 func (plugin *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error) {
-	if req != nil && req.RequestType == schemas.RealtimeRequest {
-		return req, nil, nil
-	}
-
 	var traceID string
 	var traceName string
 	var sessionID string
@@ -527,11 +522,6 @@ func (plugin *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifro
 //   - *schemas.BifrostError: The original error, unmodified
 //   - error: Never returns an error as it handles missing IDs gracefully
 func (plugin *Plugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
-	requestType, _, _, _ := bifrost.GetResponseFields(result, bifrostErr)
-	if requestType == schemas.RealtimeRequest {
-		return result, bifrostErr, nil
-	}
-
 	// Get effective log repo ID for this request
 	effectiveLogRepoID := plugin.getEffectiveLogRepoID(ctx)
 	if effectiveLogRepoID == "" {
@@ -555,11 +545,7 @@ func (plugin *Plugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.B
 	isFinalChunk := bifrost.IsFinalChunk(ctx)
 
 	go func() {
-		requestType, _, originalModel, resolvedModel := bifrost.GetResponseFields(result, bifrostErr)
-		modelTag := resolvedModel
-		if modelTag == "" {
-			modelTag = originalModel
-		}
+		requestType, _, model := bifrost.GetResponseFields(result, bifrostErr)
 
 		var streamResponse *streaming.ProcessedStreamResponse
 		if bifrost.IsStreamRequestType(requestType) {
@@ -664,11 +650,11 @@ func (plugin *Plugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.B
 				}
 			}
 		}
-		if hasGenerationID && generationID != "" && modelTag != "" {
-			logger.AddTagToGeneration(generationID, "model", string(modelTag))
+		if hasGenerationID && generationID != "" {
+			logger.AddTagToGeneration(generationID, "model", string(model))
 		}
-		if hasTraceID && traceID != "" && modelTag != "" {
-			logger.AddTagToTrace(traceID, "model", string(modelTag))
+		if hasTraceID && traceID != "" {
+			logger.AddTagToTrace(traceID, "model", string(model))
 		}
 		// Flush only the effective logger that was used for this request
 		logger.Flush()

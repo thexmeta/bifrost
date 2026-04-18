@@ -1,17 +1,12 @@
-import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
+"use client";
+
 import { NoPermissionView } from "@/components/noPermissionView";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import Providers from "./page";
 
-function RouteComponent() {
+export default function ProvidersLayout({ children }: { children: React.ReactNode }) {
 	const hasProvidersAccess = useRbac(RbacResource.ModelProvider, RbacOperation.View);
-	const childMatches = useChildMatches();
 	if (!hasProvidersAccess) {
 		return <NoPermissionView entity="model providers" />;
 	}
-	return childMatches.length === 0 ? <Providers /> : <Outlet />;
+	return <div>{children}</div>;
 }
-
-export const Route = createFileRoute("/workspace/providers")({
-	component: RouteComponent,
-});

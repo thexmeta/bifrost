@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { WalletCards } from "lucide-react";
 import { ArrowUpRight } from "lucide-react";
@@ -31,7 +33,12 @@ export function CustomersEmptyState({ onAddClick, canCreate = true }: CustomersE
 					>
 						Read more <ArrowUpRight className="text-muted-foreground h-3 w-3" />
 					</Button>
-					<Button aria-label="Add your first customer" onClick={onAddClick} disabled={!canCreate} data-testid="customer-button-create">
+					<Button
+						aria-label="Add your first customer"
+						onClick={onAddClick}
+						disabled={!canCreate}
+						data-testid="customer-button-create"
+					>
 						Add Customer
 					</Button>
 				</div>

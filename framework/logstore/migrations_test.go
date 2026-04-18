@@ -45,12 +45,11 @@ func trySetupPostgresDB(t *testing.T) *gorm.DB {
 func setupLogsTableForGINIndexTest(t *testing.T, db *gorm.DB) {
 	t.Helper()
 
-	// Drop existing tables and migration tracking in the correct order.
-	// Preserve the shared migrations table — only clear its rows.
+	// Drop existing tables and migration tracking in the correct order
+	// Note: The migrator uses "migrations" table by default, not "gomigrate"
 	db.Exec("DROP INDEX IF EXISTS idx_logs_metadata_gin")
 	db.Exec("DROP TABLE IF EXISTS logs")
-	db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)")
-	db.Exec("DELETE FROM migrations")
+	db.Exec("DROP TABLE IF EXISTS migrations")
 
 	// Create a minimal logs table with only the columns needed for the test
 	err := db.Exec(`
@@ -73,7 +72,7 @@ func setupLogsTableForGINIndexTest(t *testing.T, db *gorm.DB) {
 	t.Cleanup(func() {
 		db.Exec("DROP INDEX IF EXISTS idx_logs_metadata_gin")
 		db.Exec("DROP TABLE IF EXISTS logs")
-		db.Exec("DELETE FROM migrations")
+		db.Exec("DROP TABLE IF EXISTS migrations")
 	})
 }
 

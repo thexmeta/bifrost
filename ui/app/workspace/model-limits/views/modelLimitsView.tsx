@@ -1,3 +1,5 @@
+"use client";
+
 import { getErrorMessage, useGetModelConfigsQuery } from "@/lib/store";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";

@@ -1,3 +1,5 @@
+"use client";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ProviderFilterSelectProps {
@@ -10,7 +12,7 @@ interface ProviderFilterSelectProps {
 export function ProviderFilterSelect({ providers, selectedProvider, onProviderChange, "data-testid": testId }: ProviderFilterSelectProps) {
 	return (
 		<Select value={selectedProvider} onValueChange={onProviderChange}>
-			<SelectTrigger className="!h-7.5 w-[110px] text-xs sm:w-[130px]" data-testid={testId} size="sm">
+			<SelectTrigger className="w-[110px] text-xs sm:w-[130px] !h-7.5" data-testid={testId} size="sm">
 				<SelectValue placeholder="All Providers" />
 			</SelectTrigger>
 			<SelectContent>

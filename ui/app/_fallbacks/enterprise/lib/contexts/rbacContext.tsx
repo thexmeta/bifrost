@@ -1,3 +1,5 @@
+"use client";
+
 import { createContext, useContext } from "react";
 
 // RBAC Resource Names (must match backend definitions)
@@ -25,7 +27,6 @@ export enum RbacResource {
 	PIIRedactor = "PIIRedactor",
 	PromptRepository = "PromptRepository",
 	PromptDeploymentStrategy = "PromptDeploymentStrategy",
-	AccessProfiles = "AccessProfiles",
 }
 
 // RBAC Operation Names (must match backend definitions)
@@ -64,7 +65,7 @@ export function RbacProvider({ children }: { children: React.ReactNode }) {
 }
 
 // Hook that always returns true (no restrictions in OSS)
-export function useRbac(_resource: RbacResource, _operation: RbacOperation): boolean {
+export function useRbac(resource: RbacResource, operation: RbacOperation): boolean {
 	return true;
 }
 

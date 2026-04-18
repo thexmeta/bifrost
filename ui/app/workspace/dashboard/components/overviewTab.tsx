@@ -1,3 +1,5 @@
+"use client";
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
 	CostHistogramResponse,
@@ -190,9 +192,7 @@ export function OverviewTab({
 											{costModels.length > 1 && (
 												<Tooltip>
 													<TooltipTrigger asChild>
-														<span tabIndex={0} data-testid="cost-legend-more-trigger" className="text-muted-foreground cursor-default">
-															+{costModels.length - 1} more
-														</span>
+														<span tabIndex={0} data-testid="cost-legend-more-trigger" className="text-muted-foreground cursor-default">+{costModels.length - 1} more</span>
 													</TooltipTrigger>
 													<TooltipContent>
 														<div className="flex flex-col gap-1">
@@ -258,9 +258,7 @@ export function OverviewTab({
 											{usageModels.length > 1 && (
 												<Tooltip>
 													<TooltipTrigger asChild>
-														<span tabIndex={0} data-testid="usage-legend-more-trigger" className="text-muted-foreground cursor-default">
-															+{usageModels.length - 1} more
-														</span>
+														<span tabIndex={0} data-testid="usage-legend-more-trigger" className="text-muted-foreground cursor-default">+{usageModels.length - 1} more</span>
 													</TooltipTrigger>
 													<TooltipContent>
 														<div className="flex flex-col gap-1">

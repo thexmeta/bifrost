@@ -1,3 +1,5 @@
+"use client";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -40,7 +42,7 @@ function buildSequenceItems(plugins: Plugin[]): SequenceItem[] {
 
 function SortableBlock({ item, index }: { item: SequenceItem; index: number }) {
 	const isBuiltin = item.type === "builtin";
-	const { ref, isDragging, handleRef, targetRef } = useSortable({
+	const { ref, isDragging, handleRef, sourceRef, targetRef } = useSortable({
 		id: item.id,
 		index,
 	});

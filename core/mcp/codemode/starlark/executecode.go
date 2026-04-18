@@ -5,6 +5,7 @@ package starlark
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,11 +13,9 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	codemcp "github.com/maximhq/bifrost/core/mcp"
-	"github.com/maximhq/bifrost/core/mcp/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
-	"go.starlark.net/syntax"
 )
 
 // ExecutionResult represents the result of code execution
@@ -53,11 +52,8 @@ type ExecutionEnvironment struct {
 func (s *StarlarkCodeMode) createExecuteToolCodeTool() schemas.ChatTool {
 	executeToolCodeProps := schemas.NewOrderedMapFromPairs(
 		schemas.KV("code", map[string]interface{}{
-			"type": "string",
-			"description": "Python (Starlark) code to execute. Tool calls are synchronous: result = server.tool(param=\"value\"). " +
-				"Use print() for logging. Assign to 'result' variable to return a value. " +
-				"Retry after fixing syntax or logic errors, especially for read-only flows. Before rerunning code that already made tool calls, inspect prior outputs and avoid replaying stateful operations. " +
-				"Example: items = server.list_items()\nfor item in items:\n    print(item[\"name\"])\nresult = items",
+			"type":        "string",
+			"description": "Python code to execute. The code runs in a Starlark interpreter (Python subset). Tool calls are synchronous - no async/await needed. For loops/conditionals, wrap in a function. Use print() for logging. ALWAYS retry if code fails. Example: def main():\n  items = server.list_items()\n  for item in items:\n    print(item)\nresult = main()",
 		}),
 	)
 	return schemas.ChatTool{
@@ -65,36 +61,36 @@ func (s *StarlarkCodeMode) createExecuteToolCodeTool() schemas.ChatTool {
 		Function: &schemas.ChatToolFunction{
 			Name: codemcp.ToolTypeExecuteToolCode,
 			Description: schemas.Ptr(
-				"Executes Python code in a sandboxed Starlark interpreter with MCP server tool access. " +
-					"Servers are exposed as global objects: result = serverName.toolName(param=\"value\"). " +
-					"This is the final step of the four-tool code mode workflow: listToolFiles -> readToolFile -> (optional) getToolDocs -> executeToolCode. " +
-					"If you have not already read a tool's .pyi stub in this conversation, do that before writing code. " +
-					"Do NOT guess callable tool names from natural language or stale assumptions; use the exact identifier returned by listToolFiles/readToolFile. " +
+				"Executes Python code inside a sandboxed Starlark interpreter with access to all connected MCP servers' tools. " +
+					"All connected servers are exposed as global objects named after their configuration keys, and each server " +
+					"provides functions for every tool available on that server. The canonical usage pattern is: " +
+					"result = <serverName>.<toolName>(param=\"value\"). Both <serverName> and <toolName> should be discovered " +
+					"using listToolFiles and readToolFile. " +
 
-					"STARLARK DIFFERENCES FROM PYTHON — READ BEFORE WRITING CODE: " +
-					"1. NO try/except/finally/raise — error handling is not supported, and tool failures cannot be caught inside Starlark. " +
-					"2. NO classes — use dicts and functions. " +
-					"3. NO imports, direct network access, or direct filesystem access — use MCP tools instead. " +
-					"4. NO is operator — use == for comparison. " +
-					"5. NO f-strings — use % formatting: \"Hello %s, count=%d\" % (name, n). " +
-					"6. Each executeToolCode call runs in a FRESH ISOLATED SCOPE — no variables, functions, or state persist between calls. Re-fetch data or store it via MCP tools (e.g., SQLite, FileSystem) if needed across calls. " +
+					"IMPORTANT WORKFLOW: Always follow this order — first use listToolFiles to see available servers and tools, " +
+					"then use readToolFile to understand the tool definitions and their parameters, and finally use executeToolCode " +
+					"to execute your code. " +
 
 					"SYNTAX NOTES: " +
-					"• Synchronous calls — NO async/await: result = server.tool(arg=\"value\") " +
+					"• Tool calls are synchronous - NO async/await needed, just call directly: result = server.tool(arg=\"value\") " +
 					"• Use keyword arguments: server.tool(param=\"value\") NOT server.tool({\"param\": \"value\"}) " +
 					"• Access dict values with brackets: result[\"key\"] NOT result.key " +
-					"• Use print() for logging/debugging " +
-					"• List comprehensions: [x for x in items if x[\"active\"]] " +
-					"• String escapes work normally: \"line1\\nline2\" produces a newline " +
-					"• Triple-quoted strings for multiline: \"\"\"multi\\nline\"\"\" " +
-					"• chr(10) for newline character, chr(9) for tab " +
-					"• To return a value, assign to 'result': result = computed_value " +
-					"• MCP tool calls are timeout-limited; avoid long or infinite loops " +
+					"• Use print() for logging (not console.log) " +
+					"• List comprehensions work: [x for x in items if x[\"active\"]] " +
+					"• To return a value, assign to 'result' variable: result = computed_value " +
+					"• CRITICAL: for/if/while at top level MUST be inside a function - def main(): ... then result = main() " +
 
-					"AVAILABLE BUILTINS: print, len, range, enumerate, zip, sorted, reversed, min, max, " +
-					"int, float, str, bool, list, dict, tuple, set, hasattr, getattr, type, chr, ord, any, all, hash, repr. " +
+					"RETRY POLICY: ALWAYS retry if a code block fails. Analyze the error, adjust your code, and retry. " +
 
-					"RETRY POLICY: Retry after fixing syntax or logic errors, especially for read-only flows. Before rerunning code that already made tool calls, inspect prior outputs and avoid replaying stateful operations.",
+					"The environment is intentionally minimal: " +
+					"• No imports needed or supported " +
+					"• No network APIs (use MCP tools for external interactions) " +
+					"• No file system access (use MCP tools) " +
+					"• No classes (use dicts and functions) " +
+					"• Deterministic execution (no random, no time) " +
+
+					"Long-running operations are interrupted via execution timeout. " +
+					"This tool is designed specifically for orchestrating MCP tool calls and lightweight computation.",
 			),
 
 			Parameters: &schemas.ToolFunctionParameters{
@@ -107,7 +103,7 @@ func (s *StarlarkCodeMode) createExecuteToolCodeTool() schemas.ChatTool {
 }
 
 // handleExecuteToolCode handles the executeToolCode tool call.
-func (s *StarlarkCodeMode) handleExecuteToolCode(ctx *schemas.BifrostContext, toolCall schemas.ChatAssistantMessageToolCall) (*schemas.ChatMessage, error) {
+func (s *StarlarkCodeMode) handleExecuteToolCode(ctx context.Context, toolCall schemas.ChatAssistantMessageToolCall) (*schemas.ChatMessage, error) {
 	toolName := "unknown"
 	if toolCall.Function.Name != nil {
 		toolName = *toolCall.Function.Name
@@ -201,13 +197,16 @@ func (s *StarlarkCodeMode) handleExecuteToolCode(ctx *schemas.BifrostContext, to
 }
 
 // executeCode executes Python (Starlark) code in a sandboxed interpreter with MCP tool bindings.
-func (s *StarlarkCodeMode) executeCode(ctx *schemas.BifrostContext, code string) ExecutionResult {
+func (s *StarlarkCodeMode) executeCode(ctx context.Context, code string) ExecutionResult {
 	logs := []string{}
 
 	s.logger.Debug("%s Starting Starlark code execution", codemcp.CodeModeLogPrefix)
 
-	// Step 1: Handle empty code
-	trimmedCode := strings.TrimSpace(code)
+	// Step 1: Convert literal \n escape sequences to actual newlines
+	codeWithNewlines := strings.ReplaceAll(code, "\\n", "\n")
+
+	// Step 2: Handle empty code
+	trimmedCode := strings.TrimSpace(codeWithNewlines)
 	if trimmedCode == "" {
 		return ExecutionResult{
 			Result: nil,
@@ -219,7 +218,7 @@ func (s *StarlarkCodeMode) executeCode(ctx *schemas.BifrostContext, code string)
 		}
 	}
 
-	// Step 2: Build tool bindings for all connected servers
+	// Step 3: Build tool bindings for all connected servers
 	availableToolsPerClient := s.clientManager.GetToolPerClient(ctx)
 	serverKeys := make([]string, 0, len(availableToolsPerClient))
 	predeclared := starlark.StringDict{}
@@ -255,8 +254,9 @@ func (s *StarlarkCodeMode) executeCode(ctx *schemas.BifrostContext, code string)
 			}
 
 			originalToolName := tool.Function.Name
-			parsedToolName := getCanonicalToolName(clientName, originalToolName)
-			compatibilityAlias := getCompatibilityToolAlias(clientName, originalToolName)
+			unprefixedToolName := stripClientPrefix(originalToolName, clientName)
+			unprefixedToolName = strings.ReplaceAll(unprefixedToolName, "-", "_")
+			parsedToolName := parseToolName(unprefixedToolName)
 
 			s.logger.Debug("%s [%s] Binding tool: %s -> %s", codemcp.CodeModeLogPrefix, clientName, originalToolName, parsedToolName)
 
@@ -298,13 +298,6 @@ func (s *StarlarkCodeMode) executeCode(ctx *schemas.BifrostContext, code string)
 			})
 
 			structMembers[parsedToolName] = toolFunc
-
-			if compatibilityAlias != parsedToolName && isValidStarlarkIdentifier(compatibilityAlias) {
-				if _, exists := structMembers[compatibilityAlias]; !exists {
-					structMembers[compatibilityAlias] = toolFunc
-					s.logger.Debug("%s [%s] Added compatibility alias: %s -> %s", codemcp.CodeModeLogPrefix, clientName, compatibilityAlias, parsedToolName)
-				}
-			}
 		}
 
 		// Create a struct for this server
@@ -319,7 +312,7 @@ func (s *StarlarkCodeMode) executeCode(ctx *schemas.BifrostContext, code string)
 		s.logger.Debug("%s No servers available for code mode execution", codemcp.CodeModeLogPrefix)
 	}
 
-	// Step 3: Create Starlark thread with print function and timeout
+	// Step 4: Create Starlark thread with print function and timeout
 	toolExecutionTimeout := s.getToolExecutionTimeout()
 	timeoutCtx, cancel := context.WithTimeout(ctx, toolExecutionTimeout)
 	defer cancel()
@@ -331,26 +324,11 @@ func (s *StarlarkCodeMode) executeCode(ctx *schemas.BifrostContext, code string)
 		},
 	}
 
-	// Set up cancellation check — watch the context and cancel the Starlark
-	// thread so that infinite loops and other long-running scripts are interrupted
-	// when the execution timeout fires.
+	// Set up cancellation check
 	thread.SetLocal("context", timeoutCtx)
-	go func() {
-		<-timeoutCtx.Done()
-		thread.Cancel(timeoutCtx.Err().Error())
-	}()
-
-	// Step 4: Configure Starlark dialect options for a Python-like experience
-	starlarkOpts := &syntax.FileOptions{
-		TopLevelControl: true, // allow if/for/while at top level (not just inside functions)
-		While:           true, // enable while loops
-		Set:             true, // enable set() builtin
-		GlobalReassign:  true, // allow reassignment to top-level names
-		Recursion:       true, // allow recursive functions
-	}
 
 	// Step 5: Execute the code
-	globals, err := starlark.ExecFileOptions(starlarkOpts, thread, "code.star", trimmedCode, predeclared)
+	globals, err := starlark.ExecFile(thread, "code.star", trimmedCode, predeclared)
 
 	if err != nil {
 		errorMessage := err.Error()
@@ -394,7 +372,7 @@ func (s *StarlarkCodeMode) executeCode(ctx *schemas.BifrostContext, code string)
 }
 
 // callMCPTool calls an MCP tool and returns the result.
-func (s *StarlarkCodeMode) callMCPTool(ctx *schemas.BifrostContext, clientName, toolName string, args map[string]interface{}, appendLog func(string)) (interface{}, error) {
+func (s *StarlarkCodeMode) callMCPTool(ctx context.Context, clientName, toolName string, args map[string]interface{}, appendLog func(string)) (interface{}, error) {
 	// Get available tools per client
 	availableToolsPerClient := s.clientManager.GetToolPerClient(ctx)
 
@@ -422,25 +400,29 @@ func (s *StarlarkCodeMode) callMCPTool(ctx *schemas.BifrostContext, clientName, 
 	// Strip the client name prefix from tool name before calling MCP server
 	originalToolName := stripClientPrefix(toolName, clientName)
 
-	originalRequestID, ok := ctx.Value(schemas.BifrostContextKeyRequestID).(string)
-	if !ok {
-		originalRequestID = ""
+	// Get BifrostContext for plugin pipeline
+	var bifrostCtx *schemas.BifrostContext
+	var ok bool
+	if bifrostCtx, ok = ctx.(*schemas.BifrostContext); !ok {
+		return s.callMCPToolDirect(ctx, client, originalToolName, clientName, toolName, args, appendLog)
 	}
+
+	originalRequestID, _ := bifrostCtx.Value(schemas.BifrostContextKeyRequestID).(string)
 
 	// Generate new request ID for this nested tool call
 	var newRequestID string
 	if s.fetchNewRequestIDFunc != nil {
-		newRequestID = s.fetchNewRequestIDFunc(ctx)
+		newRequestID = s.fetchNewRequestIDFunc(bifrostCtx)
 	} else {
 		newRequestID = fmt.Sprintf("exec_%d_%s", time.Now().UnixNano(), toolName)
 	}
 
 	// Create new child context
-	deadline, hasDeadline := ctx.Deadline()
+	deadline, hasDeadline := bifrostCtx.Deadline()
 	if !hasDeadline {
 		deadline = schemas.NoDeadline
 	}
-	nestedCtx := schemas.NewBifrostContext(ctx, deadline)
+	nestedCtx := schemas.NewBifrostContext(bifrostCtx, deadline)
 	nestedCtx.SetValue(schemas.BifrostContextKeyRequestID, newRequestID)
 	if originalRequestID != "" {
 		nestedCtx.SetValue(schemas.BifrostContextKeyParentMCPRequestID, originalRequestID)
@@ -469,17 +451,13 @@ func (s *StarlarkCodeMode) callMCPTool(ctx *schemas.BifrostContext, clientName, 
 
 	// Check if plugin pipeline is available
 	if s.pluginPipelineProvider == nil {
-		// Should never happen, but just in case
-		s.logger.Warn("%s Plugin pipeline provider is nil", codemcp.CodeModeLogPrefix)
-		return nil, fmt.Errorf("plugin pipeline provider is nil")
+		return s.callMCPToolDirect(ctx, client, originalToolName, clientName, toolName, args, appendLog)
 	}
 
 	// Get plugin pipeline and run hooks
 	pipeline := s.pluginPipelineProvider()
 	if pipeline == nil {
-		// Should never happen, but just in case
-		s.logger.Warn("%s Plugin pipeline is nil", codemcp.CodeModeLogPrefix)
-		return nil, fmt.Errorf("plugin pipeline is nil")
+		return s.callMCPToolDirect(ctx, client, originalToolName, clientName, toolName, args, appendLog)
 	}
 	defer s.releasePluginPipeline(pipeline)
 
@@ -537,7 +515,14 @@ func (s *StarlarkCodeMode) callMCPTool(ctx *schemas.BifrostContext, clientName, 
 			Name:      toolNameToCall,
 			Arguments: args,
 		},
-		Header: utils.GetHeadersForToolExecution(nestedCtx, client),
+	}
+
+	if client.ExecutionConfig.Headers != nil {
+		headers := make(http.Header)
+		for key, value := range client.ExecutionConfig.Headers {
+			headers.Add(key, value.GetValue())
+		}
+		callRequest.Header = headers
 	}
 
 	toolExecutionTimeout := s.getToolExecutionTimeout()
@@ -618,4 +603,58 @@ func (s *StarlarkCodeMode) callMCPTool(ctx *schemas.BifrostContext, clientName, 
 	}
 
 	return nil, fmt.Errorf("plugin post-hooks returned invalid response")
+}
+
+// callMCPToolDirect executes an MCP tool call directly without plugin hooks.
+func (s *StarlarkCodeMode) callMCPToolDirect(ctx context.Context, client *schemas.MCPClientState, originalToolName, clientName, toolName string, args map[string]interface{}, appendLog func(string)) (interface{}, error) {
+	callRequest := mcp.CallToolRequest{
+		Request: mcp.Request{
+			Method: string(mcp.MethodToolsCall),
+		},
+		Params: mcp.CallToolParams{
+			Name:      originalToolName,
+			Arguments: args,
+		},
+	}
+
+	if client.ExecutionConfig.Headers != nil {
+		headers := make(http.Header)
+		for key, value := range client.ExecutionConfig.Headers {
+			headers.Add(key, value.GetValue())
+		}
+		callRequest.Header = headers
+	}
+
+	toolExecutionTimeout := s.getToolExecutionTimeout()
+	toolCtx, cancel := context.WithTimeout(ctx, toolExecutionTimeout)
+	defer cancel()
+
+	logToolName := stripClientPrefix(toolName, clientName)
+	logToolName = strings.ReplaceAll(logToolName, "-", "_")
+
+	toolResponse, callErr := client.Conn.CallTool(toolCtx, callRequest)
+	if callErr != nil {
+		s.logger.Debug("%s Tool call failed: %s.%s - %v", codemcp.CodeModeLogPrefix, clientName, logToolName, callErr)
+		appendLog(fmt.Sprintf("[TOOL] %s.%s error: %v", clientName, logToolName, callErr))
+		return nil, fmt.Errorf("tool call failed for %s.%s: %v", clientName, logToolName, callErr)
+	}
+
+	rawResult := extractTextFromMCPResponse(toolResponse, toolName)
+
+	if after, ok := strings.CutPrefix(rawResult, "Error: "); ok {
+		errorMsg := after
+		s.logger.Debug("%s Tool returned error result: %s.%s - %s", codemcp.CodeModeLogPrefix, clientName, logToolName, errorMsg)
+		appendLog(fmt.Sprintf("[TOOL] %s.%s error result: %s", clientName, logToolName, errorMsg))
+		return nil, fmt.Errorf("%s", errorMsg)
+	}
+
+	var finalResult interface{}
+	if err := sonic.Unmarshal([]byte(rawResult), &finalResult); err != nil {
+		finalResult = rawResult
+	}
+
+	resultStr := formatResultForLog(finalResult)
+	appendLog(fmt.Sprintf("[TOOL] %s.%s raw response: %s", clientName, logToolName, resultStr))
+
+	return finalResult, nil
 }

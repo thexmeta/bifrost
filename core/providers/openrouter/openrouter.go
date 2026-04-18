@@ -4,6 +4,7 @@ package openrouter
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -94,12 +95,12 @@ func (provider *OpenRouterProvider) validateKey(ctx *schemas.BifrostContext, key
 	// Check for auth errors (401, 403)
 	statusCode := resp.StatusCode()
 	if statusCode == fasthttp.StatusUnauthorized || statusCode == fasthttp.StatusForbidden {
-		return openai.ParseOpenAIError(resp)
+		return openai.ParseOpenAIError(resp, schemas.ListModelsRequest, provider.GetProviderKey(), "")
 	}
 
 	// Any 4xx/5xx error indicates the key might be invalid
 	if statusCode >= 400 {
-		return openai.ParseOpenAIError(resp)
+		return openai.ParseOpenAIError(resp, schemas.ListModelsRequest, provider.GetProviderKey(), "")
 	}
 
 	return nil
@@ -108,6 +109,8 @@ func (provider *OpenRouterProvider) validateKey(ctx *schemas.BifrostContext, key
 // listModelsByKey performs a list models request for a single key.
 // Returns the response and latency, or an error if the request fails.
 func (provider *OpenRouterProvider) listModelsByKey(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
+	providerName := provider.GetProviderKey()
+
 	// Validate the key first using /v1/auth/key (only during provider add/update).
 	// OpenRouter's /v1/models doesn't require auth, so we need this extra check.
 	shouldValidate := false
@@ -155,7 +158,7 @@ func (provider *OpenRouterProvider) listModelsByKey(ctx *schemas.BifrostContext,
 			// Continue with empty response; allowed models will be backfilled below.
 			modelsFetched = false
 		} else {
-			bifrostErr := openai.ParseOpenAIError(resp)
+			bifrostErr := openai.ParseOpenAIError(resp, schemas.ListModelsRequest, providerName, "")
 			return nil, bifrostErr
 		}
 	}
@@ -182,62 +185,45 @@ func (provider *OpenRouterProvider) listModelsByKey(ctx *schemas.BifrostContext,
 		}
 	}
 
-	// OpenRouter model IDs in the API response do NOT include the "openrouter/" prefix
-	// (e.g. the API returns "openai/gpt-4", not "openrouter/openai/gpt-4").
-	// Users may supply allowedModels / aliases with or without the prefix, so we
-	// normalize both by stripping it before feeding into the shared pipeline.
+	// Filter by key.Models
+	allowedModels := key.Models
+	blacklistedModels := key.BlacklistedModels
 	providerPrefix := string(schemas.OpenRouter) + "/"
-	stripPrefix := func(s string) string {
-		if strings.HasPrefix(strings.ToLower(s), strings.ToLower(providerPrefix)) {
-			return s[len(providerPrefix):]
-		}
-		return s
-	}
 
-	normalizedAllowed := make(schemas.WhiteList, 0, len(key.Models))
-	for _, m := range key.Models {
-		normalizedAllowed = append(normalizedAllowed, stripPrefix(m))
-	}
-	normalizedBlacklist := make(schemas.BlackList, 0, len(key.BlacklistedModels))
-	for _, m := range key.BlacklistedModels {
-		normalizedBlacklist = append(normalizedBlacklist, stripPrefix(m))
-	}
-	normalizedAliases := make(map[string]string, len(key.Aliases))
-	for k, v := range key.Aliases {
-		normalizedAliases[stripPrefix(k)] = stripPrefix(v)
-	}
-
-	pipeline := &providerUtils.ListModelsPipeline{
-		AllowedModels:     normalizedAllowed,
-		BlacklistedModels: normalizedBlacklist,
-		Aliases:           normalizedAliases,
-		Unfiltered:        request.Unfiltered,
-		ProviderKey:       schemas.OpenRouter,
-		MatchFns:          providerUtils.DefaultMatchFns(),
-	}
-
-	if pipeline.ShouldEarlyExit() {
-		openrouterResponse.Data = make([]schemas.Model, 0)
-	} else {
-		included := make(map[string]bool)
+	if !request.Unfiltered && len(allowedModels) > 0 {
 		filteredData := make([]schemas.Model, 0, len(openrouterResponse.Data))
+		includedModels := make(map[string]bool)
 		for i := range openrouterResponse.Data {
-			// rawID has no "openrouter/" prefix — e.g. "openai/gpt-4"
 			rawID := openrouterResponse.Data[i].ID
-			for _, result := range pipeline.FilterModel(rawID) {
-				entry := openrouterResponse.Data[i]
-				entry.ID = providerPrefix + result.ResolvedID
-				if result.AliasValue != "" {
-					entry.Alias = schemas.Ptr(result.AliasValue)
-				} else {
-					entry.Alias = nil
-				}
-				filteredData = append(filteredData, entry)
-				included[strings.ToLower(result.ResolvedID)] = true
+			if !(slices.Contains(allowedModels, rawID) || slices.Contains(allowedModels, providerPrefix+rawID)) {
+				continue
+			}
+			if slices.Contains(blacklistedModels, rawID) || slices.Contains(blacklistedModels, providerPrefix+rawID) {
+				continue
+			}
+			openrouterResponse.Data[i].ID = providerPrefix + rawID
+			filteredData = append(filteredData, openrouterResponse.Data[i])
+			includedModels[rawID] = true
+		}
+		// Backfill allowed models not in the API response
+		for _, allowedModel := range allowedModels {
+			rawID := strings.TrimPrefix(allowedModel, providerPrefix)
+			if slices.Contains(blacklistedModels, rawID) || slices.Contains(blacklistedModels, providerPrefix+rawID) {
+				continue
+			}
+			if !includedModels[rawID] {
+				filteredData = append(filteredData, schemas.Model{
+					ID:   providerPrefix + rawID,
+					Name: schemas.Ptr(rawID),
+				})
+				includedModels[rawID] = true // avoid duplicate backfill
 			}
 		}
-		filteredData = append(filteredData, pipeline.BackfillModels(included)...)
 		openrouterResponse.Data = filteredData
+	} else {
+		for i := range openrouterResponse.Data {
+			openrouterResponse.Data[i].ID = providerPrefix + openrouterResponse.Data[i].ID
+		}
 	}
 
 	openrouterResponse.ExtraFields.Latency = latency.Milliseconds()

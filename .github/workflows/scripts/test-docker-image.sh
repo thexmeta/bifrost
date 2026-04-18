@@ -212,7 +212,8 @@ cat > "$CONFIG_FILE" << 'CONFIGEOF'
     "enable_logging": true,
     "enforce_governance_header": false,
     "allow_direct_keys": false,
-    "max_request_body_size_mb": 100
+    "max_request_body_size_mb": 100,
+    "enable_litellm_fallbacks": false
   },
   "encryption_key": ""
 }

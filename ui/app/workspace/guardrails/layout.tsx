@@ -1,17 +1,12 @@
-import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
+"use client";
+
 import { NoPermissionView } from "@/components/noPermissionView";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import GuardrailsPage from "./page";
 
-function RouteComponent() {
+export default function GuardrailsLayout({ children }: { children: React.ReactNode }) {
 	const hasGuardrailsAccess = useRbac(RbacResource.GuardrailsConfig, RbacOperation.View);
-	const childMatches = useChildMatches();
 	if (!hasGuardrailsAccess) {
 		return <NoPermissionView entity="guardrails configuration" />;
 	}
-	return childMatches.length === 0 ? <GuardrailsPage /> : <Outlet />;
+	return <div>{children}</div>;
 }
-
-export const Route = createFileRoute("/workspace/guardrails")({
-	component: RouteComponent,
-});

@@ -8,16 +8,15 @@ interface Props {
 	show: boolean;
 	onCancel: () => void;
 	provider: ModelProvider;
-	keyId: string | null;
+	keyIndex: number;
 	providerName?: string;
 }
 
-export default function AddNewKeySheet({ show, onCancel, provider, keyId, providerName }: Props) {
-	const isEditing = keyId !== null;
+export default function AddNewKeySheet({ show, onCancel, provider, keyIndex, providerName }: Props) {
+	const isEditing = keyIndex < provider.keys.length;
 	const resolvedProviderName = (providerName ?? provider.name).toLowerCase();
 	const isVLLM = resolvedProviderName === "vllm";
-	const isOllamaOrSGL = resolvedProviderName === "ollama" || resolvedProviderName === "sgl";
-	const entityLabel = isVLLM ? "model" : isOllamaOrSGL ? "server" : "key";
+	const entityLabel = isVLLM ? "model" : "key";
 	const EntityLabel = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
 	const dialogTitle = isEditing ? `Edit ${entityLabel}` : `Add new ${entityLabel}`;
 	const successMessage = isEditing ? `${EntityLabel} updated successfully` : `${EntityLabel} added successfully`;
@@ -29,7 +28,12 @@ export default function AddNewKeySheet({ show, onCancel, provider, keyId, provid
 				if (!open) onCancel();
 			}}
 		>
-			<SheetContent className="custom-scrollbar p-8" data-testid="key-form" onInteractOutside={(e) => e.preventDefault()}>
+			<SheetContent
+				className="custom-scrollbar p-8"
+				data-testid="key-form"
+				onInteractOutside={(e) => e.preventDefault()}
+				onEscapeKeyDown={(e) => e.preventDefault()}
+			>
 				<SheetHeader className="flex flex-col items-start">
 					<SheetTitle>
 						<div className="font-lg flex items-center gap-2">
@@ -43,7 +47,7 @@ export default function AddNewKeySheet({ show, onCancel, provider, keyId, provid
 				<div>
 					<ProviderKeyForm
 						provider={provider}
-						keyId={keyId}
+						keyIndex={keyIndex}
 						onCancel={onCancel}
 						onSave={() => {
 							toast.success(successMessage);

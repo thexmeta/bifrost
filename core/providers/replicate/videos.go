@@ -87,6 +87,9 @@ func ToBifrostVideoGenerationResponse(prediction *ReplicatePredictionResponse) (
 			Error: &schemas.ErrorField{
 				Message: "prediction response is nil",
 			},
+			ExtraFields: schemas.BifrostErrorExtraFields{
+				Provider: schemas.Replicate,
+			},
 		}
 	}
 

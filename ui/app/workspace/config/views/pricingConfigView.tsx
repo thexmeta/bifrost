@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -145,13 +147,7 @@ export default function PricingConfigView() {
 					</div>
 				</div>
 				<div className="flex justify-end gap-2 pt-2">
-					<Button
-						variant="outline"
-						type="button"
-						onClick={handleForceSync}
-						disabled={isForceSyncing || !hasSettingsUpdateAccess}
-						data-testid="pricing-force-sync-btn"
-					>
+					<Button variant="outline" type="button" onClick={handleForceSync} disabled={isForceSyncing || !hasSettingsUpdateAccess} data-testid="pricing-force-sync-btn">
 						{isForceSyncing ? "Syncing..." : "Force Sync Now"}
 					</Button>
 					<Button type="submit" disabled={!hasChanges || isLoading || !hasSettingsUpdateAccess} data-testid="pricing-save-btn">

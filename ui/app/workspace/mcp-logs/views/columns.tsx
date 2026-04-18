@@ -1,10 +1,12 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Status, StatusBarColors, Statuses } from "@/lib/constants/logs";
 import type { MCPToolLogEntry } from "@/lib/types/logs";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Trash2 } from "lucide-react";
-import { format, isValid } from "date-fns";
+import moment from "moment";
 
 // Helper function to validate status and return a safe Status value
 const getValidatedStatus = (status: string): Status => {
@@ -38,11 +40,10 @@ export const createMCPColumns = (
 				<ArrowUpDown className="ml-2 h-4 w-4" />
 			</Button>
 		),
-		size: 230,
+		size: 180,
 		cell: ({ row }) => {
 			const timestamp = row.original.timestamp;
-			const date = new Date(timestamp);
-			return <div className="truncate text-xs">{isValid(date) ? format(date, "yyyy-MM-dd hh:mm:ss aa (XXX)") : "Invalid date"}</div>;
+			return <div className="text-xs">{moment(timestamp).format("YYYY-MM-DD hh:mm:ss A (Z)")}</div>;
 		},
 	},
 	{
@@ -97,18 +98,10 @@ export const createMCPColumns = (
 	},
 	{
 		id: "actions",
-		size: 72,
 		cell: ({ row }) => {
 			const log = row.original;
 			return (
-				<Button
-					variant="outline"
-					size="icon"
-					className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-					onClick={() => void handleDelete(log)}
-					disabled={!hasDeleteAccess}
-					aria-label="Delete log"
-				>
+				<Button variant="outline" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => void handleDelete(log)} disabled={!hasDeleteAccess} aria-label="Delete log">
 					<Trash2 />
 				</Button>
 			);

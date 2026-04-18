@@ -21,15 +21,13 @@ func setupPerfTestDB(t *testing.T) (*RDBLogStore, *gorm.DB) {
 		t.Skip("Postgres not available, skipping test")
 	}
 
-	// Clean slate — drop test-owned tables but preserve the shared migrations
-	// table so concurrent test packages (e.g. configstore) are not disrupted.
+	// Clean slate
 	db.Exec("DROP MATERIALIZED VIEW IF EXISTS mv_logs_hourly CASCADE")
 	db.Exec("DROP MATERIALIZED VIEW IF EXISTS mv_logs_filterdata CASCADE")
 	db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS logs CASCADE")
-	db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)")
-	db.Exec("DELETE FROM migrations")
+	db.Exec("DROP TABLE IF EXISTS migrations CASCADE")
 
 	ctx := context.Background()
 	err := triggerMigrations(ctx, db)
@@ -49,7 +47,7 @@ func setupPerfTestDB(t *testing.T) (*RDBLogStore, *gorm.DB) {
 		db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS logs CASCADE")
-		db.Exec("DELETE FROM migrations")
+		db.Exec("DROP TABLE IF EXISTS migrations CASCADE")
 	})
 
 	return store, db
@@ -463,8 +461,7 @@ func TestEnsurePerformanceIndexes(t *testing.T) {
 	db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS logs CASCADE")
-	db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)")
-	db.Exec("DELETE FROM migrations")
+	db.Exec("DROP TABLE IF EXISTS migrations CASCADE")
 
 	ctx := context.Background()
 	err := triggerMigrations(ctx, db)
@@ -477,7 +474,7 @@ func TestEnsurePerformanceIndexes(t *testing.T) {
 		db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS logs CASCADE")
-		db.Exec("DELETE FROM migrations")
+		db.Exec("DROP TABLE IF EXISTS migrations CASCADE")
 	})
 
 	conn := acquirePerfTestSQLConn(t, ctx, db)

@@ -9,7 +9,7 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 )
 
-func getRequestBodyForAnthropicResponses(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, deployment string, isStreaming bool) ([]byte, *schemas.BifrostError) {
+func getRequestBodyForAnthropicResponses(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, deployment string, providerName schemas.ModelProvider, isStreaming bool) ([]byte, *schemas.BifrostError) {
 	// Large payload mode: body streams directly from the LP reader — skip all body building
 	// (matches CheckContextAndGetRequestBody guard).
 	if providerUtils.IsLargePayloadPassthroughEnabled(ctx) {
@@ -27,24 +27,24 @@ func getRequestBodyForAnthropicResponses(ctx *schemas.BifrostContext, request *s
 		if !providerUtils.JSONFieldExists(jsonBody, "max_tokens") {
 			jsonBody, err = providerUtils.SetJSONField(jsonBody, "max_tokens", providerUtils.GetMaxOutputTokensOrDefault(deployment, anthropic.AnthropicDefaultMaxTokens))
 			if err != nil {
-				return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err)
+				return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err, providerName)
 			}
 		}
 		// Replace model with deployment
 		jsonBody, err = providerUtils.SetJSONField(jsonBody, "model", deployment)
 		if err != nil {
-			return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err)
+			return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err, providerName)
 		}
 		// Delete fallbacks field
 		jsonBody, err = providerUtils.DeleteJSONField(jsonBody, "fallbacks")
 		if err != nil {
-			return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err)
+			return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err, providerName)
 		}
 		// Add stream if streaming
 		if isStreaming {
 			jsonBody, err = providerUtils.SetJSONField(jsonBody, "stream", true)
 			if err != nil {
-				return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err)
+				return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err, providerName)
 			}
 		}
 	} else {
@@ -52,10 +52,10 @@ func getRequestBodyForAnthropicResponses(ctx *schemas.BifrostContext, request *s
 		request.Model = deployment
 		reqBody, convErr := anthropic.ToAnthropicResponsesRequest(ctx, request)
 		if convErr != nil {
-			return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, convErr)
+			return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, convErr, providerName)
 		}
 		if reqBody == nil {
-			return nil, providerUtils.NewBifrostOperationError("request body is not provided", nil)
+			return nil, providerUtils.NewBifrostOperationError("request body is not provided", nil, providerName)
 		}
 
 		if isStreaming {
@@ -68,7 +68,7 @@ func getRequestBodyForAnthropicResponses(ctx *schemas.BifrostContext, request *s
 		// Marshal struct to JSON bytes, preserving field order
 		jsonBody, err = providerUtils.MarshalSorted(reqBody)
 		if err != nil {
-			return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, fmt.Errorf("failed to marshal request body: %w", err))
+			return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, fmt.Errorf("failed to marshal request body: %w", err), providerName)
 		}
 	}
 

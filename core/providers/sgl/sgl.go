@@ -3,6 +3,7 @@
 package sgl
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -49,7 +50,11 @@ func NewSGLProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*SGL
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
 	config.NetworkConfig.BaseURL = strings.TrimRight(config.NetworkConfig.BaseURL, "/")
 
-	// BaseURL is optional when keys have sgl_key_config with per-key URLs
+	// BaseURL is required for SGLang
+	if config.NetworkConfig.BaseURL == "" {
+		return nil, fmt.Errorf("base_url is required for sgl provider")
+	}
+
 	return &SGLProvider{
 		logger:              logger,
 		client:              client,
@@ -64,40 +69,27 @@ func (provider *SGLProvider) GetProviderKey() schemas.ModelProvider {
 	return schemas.SGL
 }
 
-// listModelsByKey performs a list models request for a single SGL key,
-// resolving the per-key URL so each backend is queried individually.
-func (provider *SGLProvider) listModelsByKey(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
-	return openai.ListModelsByKey(
+// ListModels performs a list models request to SGL's API.
+func (provider *SGLProvider) ListModels(ctx *schemas.BifrostContext, keys []schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
+	return openai.HandleOpenAIListModelsRequest(
 		ctx,
 		provider.client,
-		key.SGLKeyConfig.URL.GetValue()+providerUtils.GetPathFromContext(ctx, "/v1/models"),
-		key,
-		request.Unfiltered,
+		request,
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/models"),
+		keys,
 		provider.networkConfig.ExtraHeaders,
-		provider.GetProviderKey(),
+		schemas.SGL,
 		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
 	)
 }
 
-// ListModels performs a list models request to SGL's API.
-// Requests are made concurrently per key so that each backend is queried
-// with its own URL (from sgl_key_config).
-func (provider *SGLProvider) ListModels(ctx *schemas.BifrostContext, keys []schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
-	return providerUtils.HandleMultipleListModelsRequests(
-		ctx,
-		keys,
-		request,
-		provider.listModelsByKey,
-	)
-}
-
-// TextCompletion performs a text completion request to the SGL API.
+// TextCompletion is not supported by the SGL provider.
 func (provider *SGLProvider) TextCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostTextCompletionRequest) (*schemas.BifrostTextCompletionResponse, *schemas.BifrostError) {
 	return openai.HandleOpenAITextCompletionRequest(
 		ctx,
 		provider.client,
-		key.SGLKeyConfig.URL.GetValue()+providerUtils.GetPathFromContext(ctx, "/v1/completions"),
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/completions"),
 		request,
 		key,
 		provider.networkConfig.ExtraHeaders,
@@ -117,7 +109,7 @@ func (provider *SGLProvider) TextCompletionStream(ctx *schemas.BifrostContext, p
 	return openai.HandleOpenAITextCompletionStreaming(
 		ctx,
 		provider.client,
-		key.SGLKeyConfig.URL.GetValue()+providerUtils.GetPathFromContext(ctx, "/v1/completions"),
+		provider.networkConfig.BaseURL+"/v1/completions",
 		request,
 		nil,
 		provider.networkConfig.ExtraHeaders,
@@ -137,7 +129,7 @@ func (provider *SGLProvider) ChatCompletion(ctx *schemas.BifrostContext, key sch
 	return openai.HandleOpenAIChatCompletionRequest(
 		ctx,
 		provider.client,
-		key.SGLKeyConfig.URL.GetValue()+providerUtils.GetPathFromContext(ctx, "/v1/chat/completions"),
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/chat/completions"),
 		request,
 		key,
 		provider.networkConfig.ExtraHeaders,
@@ -159,7 +151,7 @@ func (provider *SGLProvider) ChatCompletionStream(ctx *schemas.BifrostContext, p
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
 		provider.client,
-		key.SGLKeyConfig.URL.GetValue()+providerUtils.GetPathFromContext(ctx, "/v1/chat/completions"),
+		provider.networkConfig.BaseURL+"/v1/chat/completions",
 		request,
 		nil,
 		provider.networkConfig.ExtraHeaders,
@@ -184,6 +176,9 @@ func (provider *SGLProvider) Responses(ctx *schemas.BifrostContext, key schemas.
 	}
 
 	response := chatResponse.ToBifrostResponsesResponse()
+	response.ExtraFields.RequestType = schemas.ResponsesRequest
+	response.ExtraFields.Provider = provider.GetProviderKey()
+	response.ExtraFields.ModelRequested = request.Model
 
 	return response, nil
 }
@@ -199,12 +194,12 @@ func (provider *SGLProvider) ResponsesStream(ctx *schemas.BifrostContext, postHo
 	)
 }
 
-// Embedding performs an embedding request to the SGL API.
+// Embedding is not supported by the SGL provider.
 func (provider *SGLProvider) Embedding(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostEmbeddingRequest) (*schemas.BifrostEmbeddingResponse, *schemas.BifrostError) {
 	return openai.HandleOpenAIEmbeddingRequest(
 		ctx,
 		provider.client,
-		key.SGLKeyConfig.URL.GetValue()+providerUtils.GetPathFromContext(ctx, "/v1/embeddings"),
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/embeddings"),
 		request,
 		key,
 		provider.networkConfig.ExtraHeaders,

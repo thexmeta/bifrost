@@ -1,3 +1,5 @@
+"use client";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,8 +14,8 @@ import { EnvVar } from "@/lib/types/schemas";
 import { parseArrayFromText } from "@/lib/utils/array";
 import { validateOrigins } from "@/lib/utils/validation";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Info } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -193,7 +195,7 @@ export default function SecurityView() {
 						<Info className="h-4 w-4 text-blue-600" />
 						<AlertDescription>
 							You will need to use Basic Auth for all your inference calls (including MCP tool execution). You can disable it below. Check{" "}
-							<Link to="/workspace/config/api-keys" className="text-md text-primary underline">
+							<Link href="/workspace/config/api-keys" className="text-md text-primary underline">
 								API Keys
 							</Link>
 						</AlertDescription>
@@ -279,7 +281,7 @@ export default function SecurityView() {
 								? "Require authentication (virtual key, API key, or user token) for all inference endpoints."
 								: "Require a virtual key for all inference requests."}{" "}
 							See{" "}
-							<a
+							<Link
 								href="https://docs.getbifrost.ai/features/governance/virtual-keys"
 								target="_blank"
 								rel="noopener noreferrer"
@@ -287,7 +289,7 @@ export default function SecurityView() {
 								data-testid="security-virtual-keys-docs-link"
 							>
 								documentation
-							</a>{" "}
+							</Link>{" "}
 							for details.
 						</p>
 					</div>
