@@ -546,7 +546,7 @@
             "value": {
               "env_var": "",
               "from_env": false,
-              "value": "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"
+              "value": "env.NVIDIA_NIM_API_KEY_1"
             },
             "weight": 1
           },
@@ -562,7 +562,7 @@
             "value": {
               "env_var": "",
               "from_env": false,
-              "value": "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"
+              "value": "env.NVIDIA_NIM_API_KEY_2"
             },
             "weight": 1
           },
@@ -578,7 +578,7 @@
             "value": {
               "env_var": "",
               "from_env": false,
-              "value": "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"
+              "value": "env.NVIDIA_NIM_API_KEY_3"
             },
             "weight": 1
           },
@@ -594,7 +594,7 @@
             "value": {
               "env_var": "",
               "from_env": false,
-              "value": "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"
+              "value": "env.NVIDIA_NIM_API_KEY_4"
             },
             "weight": 1
           },
@@ -628,7 +628,7 @@
             "value": {
               "env_var": "",
               "from_env": false,
-              "value": "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"
+              "value": "env.NVIDIA_NIM_API_KEY_5"
             },
             "weight": 1
           }
@@ -724,7 +724,7 @@
           "value": {
             "env_var": "",
             "from_env": false,
-            "value": "AIzaSyD7L5DMwEFDlUK02SSauvnduL0ZRipWjZA"
+            "value": "env.GOOGLE_API_KEY"
           },
           "weight": 1
         }
@@ -817,7 +817,7 @@
           "value": {
             "env_var": "",
             "from_env": false,
-            "value": "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"
+            "value": "env.NVIDIA_NIM_API_KEY_1"
           },
           "weight": 1
         },
@@ -833,7 +833,7 @@
           "value": {
             "env_var": "",
             "from_env": false,
-            "value": "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"
+            "value": "env.NVIDIA_NIM_API_KEY_2"
           },
           "weight": 1
         },
@@ -849,7 +849,7 @@
           "value": {
             "env_var": "",
             "from_env": false,
-            "value": "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"
+            "value": "env.NVIDIA_NIM_API_KEY_3"
           },
           "weight": 1
         },
@@ -865,7 +865,7 @@
           "value": {
             "env_var": "",
             "from_env": false,
-            "value": "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"
+            "value": "env.NVIDIA_NIM_API_KEY_4"
           },
           "weight": 1
         },
@@ -899,7 +899,7 @@
           "value": {
             "env_var": "",
             "from_env": false,
-            "value": "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"
+            "value": "env.NVIDIA_NIM_API_KEY_5"
           },
           "weight": 1
         }
@@ -943,7 +943,7 @@
           "value": {
             "env_var": "",
             "from_env": false,
-            "value": "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"
+            "value": "env.OPENROUTER_API_KEY"
           },
           "weight": 1
         }
@@ -968,7 +968,7 @@
       "api_key": {
         "env_var": "",
         "from_env": false,
-        "value": "Qd-11112345"
+        "value": "env.YOUR_API_KEY_HERE"
       },
       "host": {
         "env_var": "",

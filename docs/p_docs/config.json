@@ -728,7 +728,7 @@
   },
   "vector_store": {
     "config": {
-      "api_key": "Qd-11112345",
+      "api_key": "env.YOUR_API_KEY_HERE",
       "host": "localhost",
       "port": 6334
     },
