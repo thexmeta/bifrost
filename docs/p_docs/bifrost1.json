@@ -1,0 +1,992 @@
+{
+  "client": {
+    "allow_direct_keys": false,
+    "allowed_headers": [
+      "x-bf-vk",
+      "authorization",
+      "content-type",
+      "x-bf-team-id"
+    ],
+    "allowed_origins": ["*"],
+    "async_job_result_ttl": 3600,
+    "disable_content_logging": false,
+    "disable_db_pings_in_health": false,
+    "drop_excess_requests": false,
+    "enable_litellm_fallbacks": false,
+    "enable_logging": true,
+    "enforce_auth_on_inference": false,
+    "header_filter_config": {},
+    "hide_deleted_virtual_keys_in_filters": false,
+    "initial_pool_size": 5000,
+    "log_retention_days": 14,
+    "max_request_body_size_mb": 100,
+    "mcp_agent_depth": 10,
+    "mcp_code_mode_binding_level": "tool",
+    "mcp_tool_execution_timeout": 60,
+    "mcp_tool_sync_interval": 5,
+    "prometheus_labels": []
+  },
+  "encryption_key": null,
+  "governance": {
+    "budgets": [],
+    "customers": [
+      {
+        "config_hash": "fd0abac579d46c57e46fc978da151b9214440498dbf7910020e6a69c63d8bdbc",
+        "created_at": "2026-04-09T22:39:37.360188+03:00",
+        "id": "6ff63e09-f90e-4ff7-9afe-be85b00de1a1",
+        "name": "TheMetaDevLab",
+        "teams": null,
+        "updated_at": "2026-04-10T00:54:09.3109588+03:00",
+        "virtual_keys": null
+      }
+    ],
+    "model_configs": null,
+    "providers": null,
+    "rate_limits": [
+      {
+        "config_hash": "d0fcb1e339f3d615372e798770460220786ccac93ae7315c594da4522b5876d9",
+        "created_at": "2026-03-31T22:19:49.4650033+03:00",
+        "id": "rate-limit-1000rpm",
+        "request_current_usage": 0,
+        "request_last_reset": "2026-04-10T01:17:48.2945687+03:00",
+        "request_max_limit": 1000,
+        "request_reset_duration": "1m",
+        "token_current_usage": 0,
+        "token_last_reset": "2026-04-10T01:17:48.2945687+03:00",
+        "token_max_limit": 100000,
+        "token_reset_duration": "1m",
+        "updated_at": "2026-03-31T22:19:49.4650033+03:00"
+      },
+      {
+        "config_hash": "80d4f6adba1b2c079343680d30200a671328f253213f0c5cac5f0905fa60248a",
+        "created_at": "2026-04-09T00:30:57.8402376+03:00",
+        "id": "rate-limit-40rpm",
+        "request_current_usage": 0,
+        "request_last_reset": "2026-04-10T01:17:48.2945687+03:00",
+        "request_max_limit": 35,
+        "request_reset_duration": "1m",
+        "token_current_usage": 0,
+        "token_last_reset": "2026-04-10T01:17:48.2945687+03:00",
+        "token_max_limit": 100000,
+        "token_reset_duration": "1m",
+        "updated_at": "2026-04-09T00:30:57.8402376+03:00"
+      },
+      {
+        "config_hash": "cb92cd9f5817ece64644382b01f18c9119d71e5b7c09cb32a140222bea0089e8",
+        "created_at": "2026-04-09T22:20:24.4261904+03:00",
+        "id": "868c78a1-bf40-4976-8568-89db5977d439",
+        "request_current_usage": 0,
+        "request_last_reset": "2026-04-10T01:17:48.2945687+03:00",
+        "request_max_limit": 10,
+        "request_reset_duration": "1m",
+        "token_current_usage": 0,
+        "token_last_reset": "2026-04-09T22:20:24.4261904+03:00",
+        "updated_at": "2026-04-10T00:54:09.3104388+03:00"
+      },
+      {
+        "config_hash": "97ba90472b86543055ccfc941b3ad1cc9863e7985a7d5a8875f59a22946c3194",
+        "created_at": "2026-04-09T22:34:29.218296+03:00",
+        "id": "rate-limit-10rpm",
+        "request_current_usage": 0,
+        "request_last_reset": "2026-04-10T01:17:48.2945687+03:00",
+        "request_max_limit": 10,
+        "request_reset_duration": "1m",
+        "token_current_usage": 0,
+        "token_last_reset": "2026-04-10T01:17:48.2945687+03:00",
+        "token_max_limit": 15000,
+        "token_reset_duration": "1m",
+        "updated_at": "2026-04-09T22:38:54.4558247+03:00"
+      }
+    ],
+    "routing_rules": [
+      {
+        "cel_expression": "",
+        "config_hash": "186c0d553003682b86821aedc6a6d83aaae1dcad0d5e3d87714e39c099e49573",
+        "created_at": "2026-03-31T22:19:49.4680705+03:00",
+        "description": "",
+        "enabled": false,
+        "id": "route-by-vk",
+        "name": "Premium team gets better models",
+        "priority": 1,
+        "query": {
+          "combinator": "and",
+          "id": "ecaaf417-6cad-4896-ae6f-ad5a96f84f5a",
+          "rules": []
+        },
+        "scope": "virtual_key",
+        "scope_id": "virtual_key-premium",
+        "targets": [
+          {
+            "model": "gpt-4-turbo",
+            "provider": "openai",
+            "weight": 1
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3178413+03:00"
+      },
+      {
+        "cel_expression": "",
+        "config_hash": "de88966a1a7eb03807c6d4b21c7889520aa8873a27bd4ab452f1c20b147c31b3",
+        "created_at": "2026-03-31T22:19:49.4675631+03:00",
+        "description": "Send all GPT-4 requests to Azure OpenAI",
+        "enabled": false,
+        "id": "route-by-model",
+        "name": "Route GPT-4 to Azure",
+        "priority": 1,
+        "query": {
+          "combinator": "and",
+          "id": "29f900b6-10aa-40d2-9ba8-9127f222d2a9",
+          "rules": []
+        },
+        "scope": "global",
+        "scope_id": null,
+        "targets": [
+          {
+            "key_id": " ",
+            "model": "gpt-4",
+            "provider": "azure",
+            "weight": 1
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3188701+03:00"
+      }
+    ],
+    "teams": [
+      {
+        "claims": null,
+        "config": null,
+        "config_hash": "41e22d8e319b3fdc3d0abf97585557a9ab991f3ddc6f4e70175a793f2cbd12c6",
+        "created_at": "2026-04-09T22:39:22.4795705+03:00",
+        "id": "a20a5f19-e8a7-4407-b7d7-22e29592f4e0",
+        "name": "TestTeam",
+        "profile": null,
+        "updated_at": "2026-04-10T00:54:09.3114785+03:00",
+        "virtual_keys": null
+      }
+    ],
+    "virtual_keys": [
+      {
+        "config_hash": "1eb902d83c44ac5139acd35de65785dedd0552f2fba674f85640ecb1e124a941",
+        "created_at": "2026-04-02T02:35:47.5576383+03:00",
+        "description": "Routes requests for chat-engine group",
+        "id": "vk-chat-engine",
+        "is_active": false,
+        "mcp_configs": null,
+        "name": "ChatEngine",
+        "provider_configs": [
+          {
+            "allowed_models": ["stepfun-ai/step-3.5-flash"],
+            "id": 20,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-chat-engine",
+            "weight": 1
+          },
+          {
+            "allowed_models": ["moonshotai/kimi-k2.5"],
+            "id": 21,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-chat-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["nvidia/nemotron-3-super-120b-a12b"],
+            "id": 22,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-chat-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["qwen/qwen3.5-122b-a10b"],
+            "id": 23,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-chat-engine",
+            "weight": 1
+          },
+          {
+            "allowed_models": ["z-ai/glm4.7"],
+            "id": 24,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-chat-engine",
+            "weight": 0
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3135346+03:00",
+        "value": "sk-bf-e9964775-9617-41e6-86e8-695b62c17111"
+      },
+      {
+        "config_hash": "49a445d2f46bbe63f4b99ee3d5274f8583c69313efc1db679ee03643399c0983",
+        "created_at": "2026-04-02T02:35:47.5592636+03:00",
+        "description": "Routes requests for coding-engine group",
+        "id": "vk-coding-engine",
+        "is_active": true,
+        "mcp_configs": null,
+        "name": "CodingEngine",
+        "provider_configs": [
+          {
+            "allowed_models": ["z-ai/glm5"],
+            "id": 26,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-coding-engine",
+            "weight": 1
+          },
+          {
+            "allowed_models": ["qwen/qwen3.5-397b-a17b"],
+            "id": 27,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-coding-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["qwen/qwen3.5-122b-a10b"],
+            "id": 28,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-coding-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["z-ai/glm4.7"],
+            "id": 29,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-coding-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["nvidia/nemotron-3-super-120b-a12b"],
+            "id": 30,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-coding-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["qwen/qwen3-coder-480b-a35b-instruct"],
+            "id": 31,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-coding-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["minimaxai/minimax-m2.5"],
+            "id": 32,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-coding-engine",
+            "weight": 0
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3146441+03:00",
+        "value": "sk-bf-fcebdbce-3c86-4237-a03f-e7e57a2b501e"
+      },
+      {
+        "config_hash": "705545468c2bcdc524dab41c148161b165dc91ebc750ee349017aea3cad52988",
+        "created_at": "2026-04-02T02:35:47.5609281+03:00",
+        "description": "Routes requests for coding-engine group",
+        "id": "vk-small-engine",
+        "is_active": false,
+        "mcp_configs": null,
+        "name": "SmallEngine",
+        "provider_configs": [
+          {
+            "allowed_models": ["nvidia/nemotron-3-nano-30b-a3b"],
+            "id": 33,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-small-engine",
+            "weight": 1
+          },
+          {
+            "allowed_models": ["moonshotai/kimi-k2-thinking"],
+            "id": 34,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-small-engine",
+            "weight": 1
+          },
+          {
+            "allowed_models": ["qwen/qwen3.5-122b-a10b"],
+            "id": 35,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-small-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["google/gemma-4-31b-it"],
+            "id": 36,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-small-engine",
+            "weight": 0
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3151973+03:00",
+        "value": "sk-bf-766bfb75-a61b-4f75-a337-e0536ce2cf61"
+      },
+      {
+        "config_hash": "891a928d8ec8454b5026c8c1f7be4ce5706793e777c710ef80f8786e5147350e",
+        "created_at": "2026-04-02T02:35:47.5620066+03:00",
+        "description": "Routes requests for text-embed-engine group",
+        "id": "vk-tool-engine",
+        "is_active": true,
+        "mcp_configs": null,
+        "name": "ToolEngine",
+        "provider_configs": [
+          {
+            "allowed_models": ["minimaxai/minimax-m2.5"],
+            "id": 37,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-tool-engine",
+            "weight": 1
+          },
+          {
+            "allowed_models": ["deepseek-ai/deepseek-v3.1-terminus"],
+            "id": 38,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-tool-engine",
+            "weight": 0
+          },
+          {
+            "allowed_models": ["nvidia/nemotron-3-super-120b-a12b"],
+            "id": 39,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-tool-engine",
+            "weight": 0
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3162714+03:00",
+        "value": "sk-bf-868ff943-e884-4f5f-a016-17ec65f851b4"
+      },
+      {
+        "config_hash": "86e3188c29174da5110b6e07d320e64ed545736e8b5379a57e8a2136842189c8",
+        "created_at": "2026-04-02T02:35:47.5625532+03:00",
+        "description": "Routes requests for text-embed-engine group",
+        "id": "vk-embeddding-engine",
+        "is_active": true,
+        "mcp_configs": null,
+        "name": "EmbedEngine",
+        "provider_configs": [
+          {
+            "allowed_models": ["nvidia/nv-embed-v1"],
+            "id": 40,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-embeddding-engine",
+            "weight": 1
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3162714+03:00",
+        "value": "sk-bf-b5b1c8a0-3d7a-475b-a99e-4921dfa045a6"
+      },
+      {
+        "config_hash": "54aca56faac063f9eaebbcf9f24b88cc0075f4d5c977975615f318e8e61e210e",
+        "created_at": "2026-04-02T02:35:47.5631437+03:00",
+        "description": "Routes requests for code-embed-engine group",
+        "id": "vk-code-embeddding-engine",
+        "is_active": true,
+        "mcp_configs": null,
+        "name": "CodeEmbedEngine",
+        "provider_configs": [
+          {
+            "allowed_models": ["nvidia/nv-embedcode-7b-v1"],
+            "id": 41,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "vk-code-embeddding-engine",
+            "weight": 1
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3167974+03:00",
+        "value": "sk-bf-1a4344d0-64f7-47de-9565-4d1aa043eb8b"
+      },
+      {
+        "config_hash": "13f20b4815bce460f48401534c65c6f61fde38dbab44c1d818980da9b3389e05",
+        "created_at": "2026-04-02T02:35:47.5636864+03:00",
+        "id": "vk-gemini-researcher",
+        "is_active": true,
+        "mcp_configs": null,
+        "name": "Gemini Grounded Research",
+        "provider_configs": [
+          {
+            "allowed_models": [
+              "gemini-3.1-flash-lite-preview",
+              "gemini-3-flash-preview"
+            ],
+            "id": 42,
+            "keys": [],
+            "provider": "google",
+            "virtual_key_id": "vk-gemini-researcher",
+            "weight": null
+          }
+        ],
+        "updated_at": "2026-04-10T00:54:09.3173241+03:00",
+        "value": "sk-bf-bfaebf8c-30aa-40d7-aced-6cd56b201338"
+      },
+      {
+        "config_hash": "7915adf10f41368c13e938cdc7292e11bc7de430d46b3728f9567f4a206eee55",
+        "created_at": "2026-04-09T22:20:24.4272889+03:00",
+        "id": "076345da-bd90-4416-80ad-f6c728bebdbb",
+        "is_active": true,
+        "mcp_configs": null,
+        "name": "qwen3-coder-480b-a35b-instruct",
+        "provider_configs": [
+          {
+            "allowed_models": [],
+            "id": 43,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "076345da-bd90-4416-80ad-f6c728bebdbb",
+            "weight": 0.5
+          }
+        ],
+        "rate_limit_id": "868c78a1-bf40-4976-8568-89db5977d439",
+        "updated_at": "2026-04-10T00:54:09.3173241+03:00",
+        "value": "sk-bf-061958f1-4b7e-4263-b2b0-2740857d5fa0"
+      },
+      {
+        "config_hash": "97312cde620a22ad594eb56f207e39733e56ca5105e6b587c7dd123c73b7df42",
+        "created_at": "2026-04-09T22:34:29.2188406+03:00",
+        "id": "qwen3-coder-480b-a35b-instruct",
+        "is_active": true,
+        "mcp_configs": null,
+        "name": "qwen3-coder",
+        "provider_configs": [
+          {
+            "allowed_models": ["qwen/qwen3-coder-480b-a35b-instruct"],
+            "id": 44,
+            "keys": [],
+            "provider": "nvidia-nim",
+            "virtual_key_id": "qwen3-coder-480b-a35b-instruct",
+            "weight": 1
+          }
+        ],
+        "rate_limit_id": "rate-limit-10rpm",
+        "updated_at": "2026-04-09T22:38:54.4563829+03:00",
+        "value": "sk-bf-061958f1-4b7e-4263-b2b0-2740857d5fa1"
+      }
+    ]
+  },
+  "mcp": {
+    "client_configs": [
+      {
+        "auth_type": "none",
+        "client_id": "f262cdfd-3f79-4a96-9956-0dffe10b2d47",
+        "connection_string": {
+          "env_var": "",
+          "from_env": false,
+          "value": "http://localhost:3303/mcp"
+        },
+        "connection_type": "http",
+        "is_code_mode_client": true,
+        "is_ping_available": true,
+        "name": "mcpproxy",
+        "tool_sync_interval": 300000000000,
+        "tools_to_auto_execute": [
+          "call_tool_read",
+          "code_execution",
+          "list_registries",
+          "read_cache",
+          "retrieve_tools",
+          "search_servers",
+          "upstream_servers",
+          "call_tool_destructive",
+          "call_tool_write"
+        ],
+        "tools_to_execute": [
+          "call_tool_destructive",
+          "call_tool_read",
+          "call_tool_write",
+          "code_execution",
+          "list_registries",
+          "read_cache",
+          "retrieve_tools",
+          "search_servers",
+          "upstream_servers"
+        ]
+      }
+    ],
+    "tool_manager_config": {
+      "code_mode_binding_level": "tool",
+      "max_agent_depth": 10,
+      "tool_execution_timeout": 60000000000
+    }
+  },
+  "plugins": [
+    {
+      "config": {
+        "cache_by_model": true,
+        "cache_by_provider": true,
+        "cleanup_on_shutdown": true,
+        "conversation_history_threshold": 2,
+        "dimension": 1024,
+        "embedding_model": "nvidia/nv-embed-v1",
+        "exclude_system_prompt": false,
+        "keys": [
+          {
+            "blacklisted_models": [],
+            "config_hash": "06b5485fa877f2ff1de2a2e627b5ae36795e20b8e979295f37f1cc12e7bc47e7",
+            "enabled": true,
+            "id": "f627d80a-4c0a-4d9a-8eaf-abad9fb2019e",
+            "models": ["z-ai/glm5"],
+            "name": "nim-glm5-key",
+            "status": "success",
+            "use_for_batch_api": false,
+            "value": {
+              "env_var": "",
+              "from_env": false,
+              "value": "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"
+            },
+            "weight": 1
+          },
+          {
+            "blacklisted_models": [],
+            "config_hash": "548ae4ded1ea798d7eaed8222a2be83a272c4eacceca4af7f7ac432a77d11ab6",
+            "enabled": true,
+            "id": "5843b42e-6f96-4b43-9a63-b4e8e97f5616",
+            "models": ["minimaxai/minimax-m2.5"],
+            "name": "nim-minimax-key",
+            "status": "success",
+            "use_for_batch_api": false,
+            "value": {
+              "env_var": "",
+              "from_env": false,
+              "value": "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"
+            },
+            "weight": 1
+          },
+          {
+            "blacklisted_models": [],
+            "config_hash": "ce0e90c4248821f8b20f39de1070ca19ee2ebf6b37fce716997407f9c2cf09ce",
+            "enabled": true,
+            "id": "a263748b-3a01-4866-a53f-d3a2acb0a3cb",
+            "models": ["moonshotai/kimi-k2-instruct"],
+            "name": "nim-kimi-k2i-key",
+            "status": "success",
+            "use_for_batch_api": false,
+            "value": {
+              "env_var": "",
+              "from_env": false,
+              "value": "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"
+            },
+            "weight": 1
+          },
+          {
+            "blacklisted_models": [],
+            "config_hash": "98bb4ca4d6ce15b5ebad625a33900bad704abb8a30b892467e84f4b6f02a81bc",
+            "enabled": true,
+            "id": "61b63889-00a6-4d96-b1d6-7f77bef063b4",
+            "models": ["moonshotai/kimi-k2-thinking"],
+            "name": "nim-kimi-k2t-key",
+            "status": "success",
+            "use_for_batch_api": false,
+            "value": {
+              "env_var": "",
+              "from_env": false,
+              "value": "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"
+            },
+            "weight": 1
+          },
+          {
+            "blacklisted_models": [],
+            "config_hash": "af30a87116d24e632efd2a36718183afc732ec36dc5bc55032849f56a5d93569",
+            "enabled": true,
+            "id": "f12c5798-c85b-48f4-aa66-6cb27224078b",
+            "models": [
+              "z-ai/glm4.7",
+              "qwen/qwen3-coder-480b-a35b-instruct",
+              "qwen/qwen3.5-122b-a10b",
+              "nvidia/nv-embed-v1",
+              "nvidia/nv-embedcode-7b-v1",
+              "google/gemma-3-27b-it",
+              "google/gemma-4-31b-it",
+              "deepseek-ai/deepseek-v3.2",
+              "deepseek-ai/deepseek-v3.1-terminus",
+              "qwen/qwen3.5-397b-a17b",
+              "stepfun-ai/step-3.5-flash",
+              "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+              "nvidia/nemotron-4-340b-instruct",
+              "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+              "nvidia/llama-3.3-nemotron-super-49b-v1",
+              "nvidia/nemotron-3-super-120b-a12b",
+              "nvidia/nemotron-3-nano-30b-a3b"
+            ],
+            "name": "nim",
+            "status": "success",
+            "use_for_batch_api": false,
+            "value": {
+              "env_var": "",
+              "from_env": false,
+              "value": "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"
+            },
+            "weight": 1
+          }
+        ],
+        "provider": "nvidia-nim",
+        "threshold": 0.82,
+        "ttl": "10m"
+      },
+      "enabled": true,
+      "name": "semantic_cache",
+      "version": 1
+    },
+    {
+      "config": {
+        "is_enterprise": true,
+        "is_vk_mandatory": false,
+        "required_headers": []
+      },
+      "enabled": true,
+      "name": "governance",
+      "version": 1
+    },
+    {
+      "config": {
+        "custom_labels": ["provider", "model", "virtual_key"],
+        "push_gateway": {
+          "enabled": false
+        }
+      },
+      "enabled": true,
+      "name": "telemetry",
+      "version": 1
+    },
+    {
+      "config": {
+        "disable_content_logging": false,
+        "logging_headers": ["x-bf-vk", "x-bf-user-id", "x-bf-team-id"]
+      },
+      "enabled": true,
+      "name": "logging",
+      "version": 1
+    },
+    {
+      "config": {
+        "collector_url": "",
+        "headers": {},
+        "insecure": true,
+        "metrics_enabled": false,
+        "metrics_endpoint": "",
+        "metrics_push_interval": 15,
+        "protocol": "http",
+        "service_name": "bifrost",
+        "tls_ca_cert": "",
+        "trace_type": "otel"
+      },
+      "enabled": true,
+      "name": "otel",
+      "version": 1
+    },
+    {
+      "config": {
+        "api_key": "env.MAXIM_API_KEY",
+        "log_repo_id": ""
+      },
+      "enabled": true,
+      "name": "maxim",
+      "version": 1
+    }
+  ],
+  "providers": {
+    "gemini": {
+      "concurrency_and_buffer_size": {
+        "buffer_size": 5000,
+        "concurrency": 1000
+      },
+      "config_hash": "edac35212696a2f024fd089e56d7b177a2fb020bf5a720d6326970790fa2fc2a",
+      "keys": [
+        {
+          "blacklisted_models": [],
+          "config_hash": "46d3813dc535f4d7e387fdad7c0b3ce45ab6781d28e5783e203a9c1710cd00b7",
+          "enabled": true,
+          "id": "24bf4cfa-4573-49be-a743-32d0d396bd6c",
+          "models": [
+            "gemma-3-27b-it",
+            "gemini-3-pro-preview",
+            "gemini-2.5-flash-lite-preview-09-2025",
+            "imagen-3.0-generate-002",
+            "gemini-1.5-flash"
+          ],
+          "name": "ddgemini",
+          "status": "success",
+          "use_for_batch_api": false,
+          "value": {
+            "env_var": "",
+            "from_env": false,
+            "value": "AIzaSyD7L5DMwEFDlUK02SSauvnduL0ZRipWjZA"
+          },
+          "weight": 1
+        }
+      ],
+      "network_config": {
+        "default_request_timeout_in_seconds": 30,
+        "insecure_skip_verify": true,
+        "max_conns_per_host": 5000,
+        "max_retries": 0,
+        "retry_backoff_initial": 500,
+        "retry_backoff_max": 5000,
+        "stream_idle_timeout_in_seconds": 60
+      },
+      "send_back_raw_request": false,
+      "send_back_raw_response": false,
+      "status": "unknown",
+      "store_raw_request_response": false
+    },
+    "nvidia-nim": {
+      "concurrency_and_buffer_size": {
+        "buffer_size": 5000,
+        "concurrency": 1000
+      },
+      "config_hash": "12461ca3ae210cfa5ad7df1df542a91e1b0a4b4e15a1d881d76ed914108e5fef",
+      "custom_provider_config": {
+        "allowed_requests": {
+          "batch_cancel": false,
+          "batch_create": false,
+          "batch_delete": false,
+          "batch_list": false,
+          "batch_results": false,
+          "batch_retrieve": false,
+          "chat_completion": true,
+          "chat_completion_stream": true,
+          "container_create": false,
+          "container_delete": false,
+          "container_file_content": false,
+          "container_file_create": false,
+          "container_file_delete": false,
+          "container_file_list": false,
+          "container_file_retrieve": false,
+          "container_list": false,
+          "container_retrieve": false,
+          "count_tokens": false,
+          "embedding": true,
+          "file_content": false,
+          "file_delete": false,
+          "file_list": false,
+          "file_retrieve": false,
+          "file_upload": false,
+          "image_edit": false,
+          "image_edit_stream": false,
+          "image_generation": false,
+          "image_generation_stream": false,
+          "image_variation": false,
+          "list_models": true,
+          "passthrough": false,
+          "passthrough_stream": false,
+          "realtime": false,
+          "rerank": false,
+          "responses": false,
+          "responses_stream": false,
+          "speech": false,
+          "speech_stream": false,
+          "text_completion": false,
+          "text_completion_stream": false,
+          "transcription": false,
+          "transcription_stream": false,
+          "video_delete": false,
+          "video_download": false,
+          "video_generation": false,
+          "video_list": false,
+          "video_remix": false,
+          "video_retrieve": false,
+          "websocket_responses": false
+        },
+        "base_provider_type": "",
+        "is_key_less": false
+      },
+      "keys": [
+        {
+          "blacklisted_models": [],
+          "config_hash": "06b5485fa877f2ff1de2a2e627b5ae36795e20b8e979295f37f1cc12e7bc47e7",
+          "enabled": true,
+          "id": "f627d80a-4c0a-4d9a-8eaf-abad9fb2019e",
+          "models": ["z-ai/glm5"],
+          "name": "nim-glm5-key",
+          "status": "success",
+          "use_for_batch_api": false,
+          "value": {
+            "env_var": "",
+            "from_env": false,
+            "value": "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"
+          },
+          "weight": 1
+        },
+        {
+          "blacklisted_models": [],
+          "config_hash": "548ae4ded1ea798d7eaed8222a2be83a272c4eacceca4af7f7ac432a77d11ab6",
+          "enabled": true,
+          "id": "5843b42e-6f96-4b43-9a63-b4e8e97f5616",
+          "models": ["minimaxai/minimax-m2.5"],
+          "name": "nim-minimax-key",
+          "status": "success",
+          "use_for_batch_api": false,
+          "value": {
+            "env_var": "",
+            "from_env": false,
+            "value": "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"
+          },
+          "weight": 1
+        },
+        {
+          "blacklisted_models": [],
+          "config_hash": "ce0e90c4248821f8b20f39de1070ca19ee2ebf6b37fce716997407f9c2cf09ce",
+          "enabled": true,
+          "id": "a263748b-3a01-4866-a53f-d3a2acb0a3cb",
+          "models": ["moonshotai/kimi-k2-instruct"],
+          "name": "nim-kimi-k2i-key",
+          "status": "success",
+          "use_for_batch_api": false,
+          "value": {
+            "env_var": "",
+            "from_env": false,
+            "value": "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"
+          },
+          "weight": 1
+        },
+        {
+          "blacklisted_models": [],
+          "config_hash": "98bb4ca4d6ce15b5ebad625a33900bad704abb8a30b892467e84f4b6f02a81bc",
+          "enabled": true,
+          "id": "61b63889-00a6-4d96-b1d6-7f77bef063b4",
+          "models": ["moonshotai/kimi-k2-thinking"],
+          "name": "nim-kimi-k2t-key",
+          "status": "success",
+          "use_for_batch_api": false,
+          "value": {
+            "env_var": "",
+            "from_env": false,
+            "value": "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"
+          },
+          "weight": 1
+        },
+        {
+          "blacklisted_models": [],
+          "config_hash": "af30a87116d24e632efd2a36718183afc732ec36dc5bc55032849f56a5d93569",
+          "enabled": true,
+          "id": "f12c5798-c85b-48f4-aa66-6cb27224078b",
+          "models": [
+            "z-ai/glm4.7",
+            "qwen/qwen3-coder-480b-a35b-instruct",
+            "qwen/qwen3.5-122b-a10b",
+            "nvidia/nv-embed-v1",
+            "nvidia/nv-embedcode-7b-v1",
+            "google/gemma-3-27b-it",
+            "google/gemma-4-31b-it",
+            "deepseek-ai/deepseek-v3.2",
+            "deepseek-ai/deepseek-v3.1-terminus",
+            "qwen/qwen3.5-397b-a17b",
+            "stepfun-ai/step-3.5-flash",
+            "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            "nvidia/nemotron-4-340b-instruct",
+            "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+            "nvidia/llama-3.3-nemotron-super-49b-v1",
+            "nvidia/nemotron-3-super-120b-a12b",
+            "nvidia/nemotron-3-nano-30b-a3b"
+          ],
+          "name": "nim",
+          "status": "success",
+          "use_for_batch_api": false,
+          "value": {
+            "env_var": "",
+            "from_env": false,
+            "value": "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"
+          },
+          "weight": 1
+        }
+      ],
+      "network_config": {
+        "base_url": "https://integrate.api.nvidia.com",
+        "default_request_timeout_in_seconds": 120,
+        "max_retries": 3,
+        "retry_backoff_initial": 0,
+        "retry_backoff_max": 0
+      },
+      "send_back_raw_request": true,
+      "send_back_raw_response": true,
+      "status": "unknown",
+      "store_raw_request_response": true
+    },
+    "openrouter": {
+      "concurrency_and_buffer_size": {
+        "buffer_size": 5000,
+        "concurrency": 1000
+      },
+      "config_hash": "e703d18a640e75b8aeba374b4969b7b139e2f5822ad3d1fe5c16c7aeb7f8ed20",
+      "keys": [
+        {
+          "blacklisted_models": [],
+          "config_hash": "865e16435e730b31cf5775ef179834738044594b872029df6a7e0b44e622a7ea",
+          "enabled": true,
+          "id": "b987ab45-9eaa-40bd-80f5-dddd7dd1cd22",
+          "models": [
+            "openrouter/free",
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-nano-30b-a3b:free",
+            "qwen/qwen3-coder:free",
+            "z-ai/glm-4.5-air:free"
+          ],
+          "name": "ek",
+          "status": "success",
+          "use_for_batch_api": false,
+          "value": {
+            "env_var": "",
+            "from_env": false,
+            "value": "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"
+          },
+          "weight": 1
+        }
+      ],
+      "network_config": {
+        "default_request_timeout_in_seconds": 30,
+        "insecure_skip_verify": true,
+        "max_conns_per_host": 5000,
+        "max_retries": 0,
+        "retry_backoff_initial": 500,
+        "retry_backoff_max": 5000,
+        "stream_idle_timeout_in_seconds": 60
+      },
+      "send_back_raw_request": false,
+      "send_back_raw_response": false,
+      "status": "unknown",
+      "store_raw_request_response": false
+    }
+  },
+  "vector_store": {
+    "config": {
+      "api_key": {
+        "env_var": "",
+        "from_env": false,
+        "value": "Qd-11112345"
+      },
+      "host": {
+        "env_var": "",
+        "from_env": false,
+        "value": "localhost"
+      },
+      "port": {
+        "env_var": "",
+        "from_env": false,
+        "value": "6334"
+      },
+      "use_tls": {
+        "env_var": "",
+        "from_env": false,
+        "value": ""
+      }
+    },
+    "enabled": true,
+    "type": "qdrant"
+  }
+}
