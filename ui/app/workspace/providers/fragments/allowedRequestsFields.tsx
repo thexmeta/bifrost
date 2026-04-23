@@ -173,7 +173,14 @@ export function AllowedRequestsFields({
 										</Tooltip>
 									</TooltipProvider>
 								) : (
-									<Switch checked={allowedField.value} onCheckedChange={allowedField.onChange} size="md" disabled={disabled} />
+									<Switch
+										checked={allowedField.value}
+										onCheckedChange={(checked) => {
+											allowedField.onChange(checked, { shouldDirty: true, shouldValidate: true });
+										}}
+										size="md"
+										disabled={disabled}
+									/>
 								)}
 							</FormControl>
 						</div>

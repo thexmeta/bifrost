@@ -1828,7 +1828,7 @@ func migrationAddBatchAndCachePricingColumns(ctx context.Context, db *gorm.DB) e
 					return err
 				}
 			}
-			if !migrator.HasColumn(&tables.TableModelPricing{}, "output_cost_per_token_batches") {
+			if !migrator.HasColumn(&tables.TableModelPricing{}, "
 				if err := migrator.AddColumn(&tables.TableModelPricing{}, "output_cost_per_token_batches"); err != nil {
 					return err
 				}
@@ -6921,6 +6921,239 @@ func migrationNormalizeOtelTraceType(ctx context.Context, db *gorm.DB) error {
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running normalize_otel_trace_type migration: %s", err.Error())
 
+	}
+	return nil
+}
+// migrationReplaceEnableLiteLLMWithCompatColumns replaces the single enable_litellm_fallbacks
+// boolean with compat feature columns. If enable_litellm_fallbacks was true,
+// only convert_text_to_chat is set to true (preserving the original behavior).
+func migrationReplaceEnableLiteLLMWithCompatColumns(ctx context.Context, db *gorm.DB) error {
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: "replace_enable_litellm_with_compat_columns",
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			mig := tx.Migrator()
+
+			// Add new columns
+			if !mig.HasColumn(&tables.TableClientConfig{}, "compat_convert_text_to_chat") {
+				if err := mig.AddColumn(&tables.TableClientConfig{}, "compat_convert_text_to_chat"); err != nil {
+					return err
+				}
+			}
+			if !mig.HasColumn(&tables.TableClientConfig{}, "compat_convert_chat_to_responses") {
+				if err := mig.AddColumn(&tables.TableClientConfig{}, "compat_convert_chat_to_responses"); err != nil {
+					return err
+				}
+			}
+			if !mig.HasColumn(&tables.TableClientConfig{}, "compat_should_drop_params") {
+				if err := mig.AddColumn(&tables.TableClientConfig{}, "compat_should_drop_params"); err != nil {
+					return err
+				}
+			}
+			if !mig.HasColumn(&tables.TableClientConfig{}, "compat_should_convert_params") {
+				if err := mig.AddColumn(&tables.TableClientConfig{}, "compat_should_convert_params"); err != nil {
+					return err
+				}
+			}
+
+			if err := tx.Exec("UPDATE config_client SET compat_should_convert_params = FALSE").Error; err != nil {
+				return err
+			}
+
+			// Migrate data: if enable_litellm_fallbacks was true, set convert_text_to_chat = true
+			if mig.HasColumn(&tables.TableClientConfig{}, "enable_litellm_fallbacks") {
+				if err := tx.Exec("UPDATE config_client SET compat_convert_text_to_chat = enable_litellm_fallbacks").Error; err != nil {
+					return err
+				}
+				if err := mig.DropColumn(&tables.TableClientConfig{}, "enable_litellm_fallbacks"); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			mig := tx.Migrator()
+
+			if tx.Migrator().HasColumn(&tables.TableClientConfig{}, "enable_litellm_fallbacks") {
+				if err := tx.Exec("ALTER TABLE config_client ADD COLUMN enable_litellm_fallbacks BOOLEAN DEFAULT FALSE").Error; err != nil {
+					return err
+				}
+			}
+			if mig.HasColumn(&tables.TableClientConfig{}, "compat_convert_text_to_chat") {
+				if err := tx.Exec("UPDATE config_client SET enable_litellm_fallbacks = COALESCE(compat_convert_text_to_chat, FALSE)").Error; err != nil {
+					return err
+				}
+			}
+			for _, col := range []string{
+				"compat_convert_text_to_chat",
+				"compat_convert_chat_to_responses",
+				"compat_should_drop_params",
+				"compat_should_convert_params",
+			} {
+				if mig.HasColumn(&tables.TableClientConfig{}, col) {
+					if err := mig.DropColumn(&tables.TableClientConfig{}, col); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error while running replace_enable_litellm_with_compat_columns migration: %s", err.Error())
+	}
+	return nil
+}
+
+// migrationDefaultCompatShouldConvertParamsFalse ensures existing deployments
+// converge to the new default for compat_should_convert_params. The earlier
+// compat migration may already be marked as applied, so changing its body is not
+// sufficient for installed databases.
+func migrationDefaultCompatShouldConvertParamsFalse(ctx context.Context, db *gorm.DB) error {
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: "default_compat_should_convert_params_false",
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			mig := tx.Migrator()
+
+			if !mig.HasColumn(&tables.TableClientConfig{}, "compat_should_convert_params") {
+				return nil
+			}
+
+			if err := tx.Exec("UPDATE config_client SET compat_should_convert_params = FALSE").Error; err != nil {
+				return err
+			}
+
+			if err := mig.AlterColumn(&tables.TableClientConfig{}, "CompatShouldConvertParams"); err != nil {
+				return fmt.Errorf("failed to alter compat_should_convert_params default: %w", err)
+			}
+
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			mig := tx.Migrator()
+
+			if !mig.HasColumn(&tables.TableClientConfig{}, "compat_should_convert_params") {
+				return nil
+			}
+
+			switch tx.Dialector.Name() {
+			case "postgres":
+				if err := tx.Exec("ALTER TABLE config_client ALTER COLUMN compat_should_convert_params SET DEFAULT FALSE").Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running default_compat_should_convert_params_false migration: %s", err.Error())
+	}
+	return nil
+}
+
+// migrationAddModelPricingUniqueIndex ensures the composite unique index (model, provider, mode)
+// exists on governance_model_pricing so that atomic ON CONFLICT upserts work correctly.
+func migrationAddModelPricingUniqueIndex(ctx context.Context, db *gorm.DB) error {
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: "add_model_pricing_unique_index",
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			mg := tx.Migrator()
+
+			// Remove duplicate rows before creating the unique index.
+			// The old find-then-insert path could have produced duplicates on
+			// multinode deployments, and CREATE UNIQUE INDEX will fail on a table
+			// that still contains them. Keep the row with the lowest ID for each
+			// (model, provider, mode) combination.
+			result := tx.Exec(`
+				DELETE FROM governance_model_pricing
+				WHERE id NOT IN (
+					SELECT MIN(id)
+					FROM governance_model_pricing
+					GROUP BY model, provider, mode
+				)
+			`)
+			if result.Error != nil {
+				return fmt.Errorf("failed to deduplicate model pricing rows: %w", result.Error)
+			}
+			if result.RowsAffected > 0 {
+				log.Printf("[migration] removed %d duplicate row(s) from governance_model_pricing before creating unique index", result.RowsAffected)
+			}
+
+			if !mg.HasIndex(&tables.TableModelPricing{}, "idx_model_provider_mode") {
+				if err := mg.CreateIndex(&tables.TableModelPricing{}, "idx_model_provider_mode"); err != nil {
+					return fmt.Errorf("failed to create unique index idx_model_provider_mode: %w", err)
+				}
+			}
+
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			mg := tx.Migrator()
+
+			if mg.HasIndex(&tables.TableModelPricing{}, "idx_model_provider_mode") {
+				if err := mg.DropIndex(&tables.TableModelPricing{}, "idx_model_provider_mode"); err != nil {
+					return fmt.Errorf("failed to drop unique index idx_model_provider_mode: %w", err)
+				}
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running add_model_pricing_unique_index migration: %s", err.Error())
+	}
+	return nil
+}
+
+// migrationNormalizeOtelTraceType rewrites the legacy OTEL plugin trace_type value "otel" to "genai_extension".
+// No-op if the plugin row is missing or trace_type is already correct.
+func migrationNormalizeOtelTraceType(ctx context.Context, db *gorm.DB) error {
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: "normalize_otel_trace_type",
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+
+			var plugin tables.TablePlugin
+			err := tx.Where("name = ?", "otel").First(&plugin).Error
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return nil
+				}
+				return fmt.Errorf("failed to load otel plugin row: %w", err)
+			}
+
+			cfgMap, ok := plugin.Config.(map[string]any)
+			if !ok || len(cfgMap) == 0 {
+				return nil
+			}
+
+			if tt, _ := cfgMap["trace_type"].(string); tt != "otel" {
+				return nil
+			}
+
+			cfgMap["trace_type"] = "genai_extension"
+			plugin.Config = cfgMap
+			plugin.ConfigJSON = ""
+			plugin.EncryptionStatus = tables.EncryptionStatusPlainText
+
+			if err := tx.Save(&plugin).Error; err != nil {
+				return fmt.Errorf("failed to save normalized otel config: %w", err)
+			}
+
+			log.Printf("[Migration] Normalized otel trace_type 'otel' to 'genai_extension'")
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running normalize_otel_trace_type migration: %s", err.Error())
 	}
 	return nil
 }

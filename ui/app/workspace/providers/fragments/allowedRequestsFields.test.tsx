@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
-import { useForm, FormProvider } from "react-hook-form";
+import { render, screen, act, fireEvent } from "@testing-library/react";
+import { useForm, FormProvider, useController } from "react-hook-form";
 import "@testing-library/jest-dom/vitest";
 
 // Mock the validation utility
@@ -17,20 +17,12 @@ vi.mock("@/lib/utils/validation", () => ({
 	},
 }));
 
-// Mock UI components with proper control wiring
-const mockFieldValues: Record<string, any> = {};
-
+// Mock UI components — FormField uses real useController hook so react-hook-form
+// actually registers fields and tracks dirty/validation state
 vi.mock("@/components/ui/form", () => ({
 	FormField: ({ render, name, control }: any) => {
-		// Use actual control to get real field state
-		const field = {
-			value: mockFieldValues[name] ?? true,
-			onChange: (val: any) => {
-				mockFieldValues[name] = val;
-			},
-			name,
-		};
-		return render({ field, fieldState: { error: null } });
+		const { field, fieldState } = useController({ name, control });
+		return render({ field, fieldState });
 	},
 	FormControl: ({ children }: any) => <div>{children}</div>,
 	FormItem: ({ children }: any) => <div>{children}</div>,
@@ -43,7 +35,7 @@ vi.mock("@/components/ui/switch", () => ({
 	Switch: ({ checked, onCheckedChange, disabled, "data-testid": testId }: any) => (
 		<button
 			type="button"
-			data-testid={testId || "switch"}
+			data-testid={testId || `switch-${name}`}
 			aria-checked={checked ?? false}
 			disabled={disabled}
 			onClick={() => onCheckedChange?.(!(checked ?? false))}
@@ -118,15 +110,11 @@ function TestWrapper({ providerType }: { providerType: string }) {
 describe("AllowedRequestsFields", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		// Reset mock field values
-		Object.keys(mockFieldValues).forEach((key) => delete mockFieldValues[key]);
 	});
 
 	it("renders all 18 request type switches", () => {
 		render(<TestWrapper providerType="openai" />);
 
-		// Each enabled request type renders a switch + a settings button for path override
-		// So we get 18 switches + 18 settings icons = 36 buttons total
 		const switches = screen.getAllByRole("button");
 		expect(switches.length).toBeGreaterThanOrEqual(18);
 	});
@@ -151,27 +139,19 @@ describe("AllowedRequestsFields", () => {
 	it("does not mark form as dirty on re-render with same providerType", async () => {
 		const { rerender } = render(<TestWrapper providerType="openai" />);
 
-		// Initially not dirty
 		expect(screen.getByTestId("is-dirty")).toHaveTextContent("false");
 
-		// Rerender with same provider type (simulates cache update after save)
 		await act(async () => {
 			rerender(<TestWrapper providerType="openai" />);
 		});
 
-		// Still not dirty - the useEffect first-render guard prevents false dirty
 		expect(screen.getByTestId("is-dirty")).toHaveTextContent("false");
 	});
 
 	it("enables all switches for openai provider", () => {
 		render(<TestWrapper providerType="openai" />);
 
-		// Each enabled request type renders a switch + a settings button for path override
-		// So we get 18 switches + 18 settings icons = 36 buttons total
 		const switches = screen.getAllByRole("button");
-		expect(switches.length).toBeGreaterThanOrEqual(18);
-
-		// Verify all 18 request types are enabled (not disabled)
 		const enabledSwitches = switches.filter((s) => !s.disabled);
 		expect(enabledSwitches.length).toBeGreaterThanOrEqual(18);
 	});
@@ -184,5 +164,48 @@ describe("AllowedRequestsFields", () => {
 
 		// Bedrock disables: text_completion, text_completion_stream
 		expect(disabledSwitches).toHaveLength(2);
+	});
+
+	it("marks form as dirty when toggling a switch", async () => {
+		render(<TestWrapper providerType="openai" />);
+
+		// Initially not dirty
+		expect(screen.getByTestId("is-dirty")).toHaveTextContent("false");
+
+		// Find switches by aria-checked attribute (not disabled buttons)
+		const allButtons = screen.getAllByRole("button");
+		const switches = allButtons.filter((s) => s.hasAttribute("aria-checked"));
+		expect(switches.length).toBeGreaterThanOrEqual(18);
+
+		const enabledSwitch = switches.find((s) => s.getAttribute("aria-checked") === "true");
+		expect(enabledSwitch).toBeDefined();
+
+		// Toggle the switch off
+		await act(async () => {
+			fireEvent.click(enabledSwitch!);
+		});
+
+		// Wait for react-hook-form dirty tracking to flush
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, 100));
+		});
+
+		// Form should now be dirty
+		expect(screen.getByTestId("is-dirty")).toHaveTextContent("true");
+	});
+
+	it("marks form as valid when toggling a switch", async () => {
+		render(<TestWrapper providerType="openai" />);
+
+		const switches = screen.getAllByRole("button");
+		const enabledSwitch = switches.find((s) => !s.disabled);
+		expect(enabledSwitch).toBeDefined();
+
+		await act(async () => {
+			enabledSwitch!.click();
+		});
+
+		// Form should be valid (no validation errors for boolean toggle)
+		expect(screen.getByTestId("is-valid")).toHaveTextContent("true");
 	});
 });
