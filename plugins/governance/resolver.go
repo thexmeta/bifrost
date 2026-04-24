@@ -329,6 +329,8 @@ func (r *BudgetResolver) isModelAllowed(vk *configstoreTables.TableVirtualKey, p
 		return false
 	}
 
+	// Check ALL provider configs that match the requested provider.
+	// A model is allowed if ANY matching provider config allows it.
 	for _, pc := range vk.ProviderConfigs {
 		if pc.Provider == string(provider) {
 			// Delegate model allowance check to model catalog

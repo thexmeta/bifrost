@@ -42,6 +42,10 @@ include recipes/fly.mk
 include recipes/ecs.mk
 include recipes/local-k8s.mk
 
+.PHONY: all help dev build-ui build build-cli run run-cli install-air clean test test-cli install-ui setup-workspace work-init work-clean docs docker-image docker-run cleanup-enterprise mod-tidy test-integrations-py test-integrations-ts install-playwright run-e2e run-e2e-ui run-e2e-headed build-and-deploy
+
+all: help
+
 # Default target
 help: ## Show this help message
 	@$(ECHO) "$(BLUE)Bifrost Development - Available Commands:$(NC)"
@@ -354,6 +358,12 @@ docker-run: ## Run Docker container (Usage: make docker-run [CONFIG=path/to/conf
 		CONFIG_MOUNT=""; \
 	fi; \
 	docker run -e APP_PORT=$(PORT) -e APP_HOST=0.0.0.0 -p $(PORT):$(PORT) -e LOG_LEVEL=$(LOG_LEVEL) -e LOG_STYLE=$(LOG_STYLE) -v $(shell pwd):/app/data $$CONFIG_MOUNT bifrost
+
+build-and-deploy: ## Build and deploy to D:\Development\CodeMode\bifrost (stops service/process first)
+	@echo "$(GREEN)╔═══════════════════════════════════════════════╗$(NC)"
+	@echo "$(GREEN)║  Building and deploying bifrost-http...       ║$(NC)"
+	@echo "$(GREEN)╚═══════════════════════════════════════════════╝$(NC)"
+	@powershell -ExecutionPolicy Bypass -File scripts/build-and-deploy.ps1 -Version "$(VERSION)"
 
 docs: ## Prepare local docs
 	@$(ECHO) "$(GREEN)Preparing local docs...$(NC)"

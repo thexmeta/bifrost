@@ -32,6 +32,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/huggingface"
 	"github.com/maximhq/bifrost/core/providers/mistral"
 	"github.com/maximhq/bifrost/core/providers/nebius"
+	"github.com/maximhq/bifrost/core/providers/nvidianim"
 	"github.com/maximhq/bifrost/core/providers/ollama"
 	"github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/providers/openrouter"
@@ -3801,20 +3802,21 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 	targetProviderKey := providerKey
 
 	if config.CustomProviderConfig != nil {
-		// Validate custom provider config
+		// If BaseProviderType is empty, this is a standard provider with only allowed_requests
+		// Use the original providerKey (no custom provider creation needed)
 		if config.CustomProviderConfig.BaseProviderType == "" {
-			return nil, fmt.Errorf("custom provider config missing base provider type")
+			targetProviderKey = providerKey
+		} else {
+			// Validate that base provider type is supported
+			if !IsSupportedBaseProvider(config.CustomProviderConfig.BaseProviderType) {
+				return nil, fmt.Errorf("unsupported base provider type: %s", config.CustomProviderConfig.BaseProviderType)
+			}
+
+			// Automatically set the custom provider key to the provider name
+			config.CustomProviderConfig.CustomProviderKey = string(providerKey)
+
+			targetProviderKey = config.CustomProviderConfig.BaseProviderType
 		}
-
-		// Validate that base provider type is supported
-		if !IsSupportedBaseProvider(config.CustomProviderConfig.BaseProviderType) {
-			return nil, fmt.Errorf("unsupported base provider type: %s", config.CustomProviderConfig.BaseProviderType)
-		}
-
-		// Automatically set the custom provider key to the provider name
-		config.CustomProviderConfig.CustomProviderKey = string(providerKey)
-
-		targetProviderKey = config.CustomProviderConfig.BaseProviderType
 	}
 
 	switch targetProviderKey {
@@ -3852,6 +3854,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return elevenlabs.NewElevenlabsProvider(config, bifrost.logger), nil
 	case schemas.Nebius:
 		return nebius.NewNebiusProvider(config, bifrost.logger)
+	case schemas.NvidiaNIM:
+		return nvidianim.NewNvidiaNIMProvider(config, bifrost.logger)
 	case schemas.HuggingFace:
 		return huggingface.NewHuggingFaceProvider(config, bifrost.logger), nil
 	case schemas.XAI:

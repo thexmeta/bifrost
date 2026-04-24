@@ -189,6 +189,13 @@ func (h *ConfigHandler) getConfig(ctx *fasthttp.RequestCtx) {
 		} else if restartConfig != nil {
 			mapConfig["restart_required"] = restartConfig
 		}
+		// Fetching enterprise config
+		enterpriseConfig, err := h.store.ConfigStore.GetEnterpriseConfig(ctx)
+		if err != nil {
+			logger.Warn("failed to get enterprise config from store: %v", err)
+		} else if enterpriseConfig != nil {
+			mapConfig["enterprise"] = enterpriseConfig
+		}
 	}
 	SendJSON(ctx, mapConfig)
 }
@@ -206,6 +213,7 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		ClientConfig    configstore.ClientConfig               `json:"client_config"`
 		FrameworkConfig configstoreTables.TableFrameworkConfig `json:"framework_config"`
 		AuthConfig      *configstore.AuthConfig                `json:"auth_config"`
+		Enterprise      map[string]any                         `json:"enterprise"`
 	}{}
 
 	if err := json.Unmarshal(ctx.PostBody(), &payload); err != nil {
@@ -629,6 +637,15 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		// Note: AuthMiddleware is updated via ServerCallbacks.UpdateAuthConfig (handled by BifrostHTTPServer)
 	}
 
+	// Handle enterprise config update
+	if payload.Enterprise != nil {
+		if err := h.store.ConfigStore.UpdateEnterpriseConfig(ctx, payload.Enterprise); err != nil {
+			logger.Warn("failed to update enterprise config: %v", err)
+			SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("failed to update enterprise config: %v", err))
+			return
+		}
+	}
+
 	// Set restart required flag if any restart-requiring configs changed
 	if len(restartReasons) > 0 {
 		reason := fmt.Sprintf("%s settings have been updated. A restart is required for changes to take full effect.", strings.Join(restartReasons, ", "))
@@ -638,6 +655,11 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		}); err != nil {
 			logger.Warn("failed to set restart required config: %v", err)
 		}
+	}
+
+	// Persist to config.json for two-way sync
+	if err := h.store.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after config update: %v", err)
 	}
 
 	ctx.SetStatusCode(fasthttp.StatusOK)

@@ -45,18 +45,8 @@ func ValidateConfigSchema(data []byte, schemaOverride ...[]byte) error {
 		// This avoids validating against a potentially stale remote schema.
 		configSchemaJSONBytes = localSchema
 	} else {
-		// Pulling config.schema from https://www.getbifrost.ai/schema
-		configSchemaJSON, err := http.Get("https://www.getbifrost.ai/schema")
-		if err != nil {
-			return fmt.Errorf("failed to get config schema: %w", err)
-		}
-		defer configSchemaJSON.Body.Close()
-		var readErr error
-		configSchemaJSONBytes, readErr = io.ReadAll(configSchemaJSON.Body)
-		if readErr != nil {
-			logger.Warn("failed to download config schema: %v. running without config.json schema validation", readErr)
-			return nil
-		}
+		// Disabled: No external schema fetch - require local schema
+		return fmt.Errorf("config schema not found locally and external fetch is disabled for offline mode")
 	}
 	// Parse the schema JSON
 	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(configSchemaJSONBytes))

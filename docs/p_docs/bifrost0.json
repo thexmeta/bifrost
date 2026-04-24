@@ -1,0 +1,430 @@
+{
+  "client": {
+    "enable_logging": true,
+    "log_retention_days": 14,
+    "async_job_result_ttl": 3600,
+    "mcp_tool_execution_timeout": 60,
+    "mcp_tool_sync_interval": 5,
+    "mcp_code_mode_binding_level": "tool",
+    "header_filter_config": {},
+    "allowed_headers": [
+      "x-bf-vk",
+      "authorization",
+      "content-type",
+      "x-bf-team-id"
+    ]
+  },
+  "governance": {
+    "auth_config": {
+      "admin_username": "env.ADMIN_USER",
+      "admin_password": "env.ADMIN_PASSWORD",
+      "is_enabled": false,
+      "disable_auth_on_inference": true
+    },
+    "rate_limits": [
+      {
+        "id": "rate-limit-40rpm",
+        "request_max_limit": 35,
+        "request_reset_duration": "1m",
+        "token_max_limit": 100000,
+        "token_reset_duration": "1m"
+      },
+      {
+        "id": "rate-limit-10rpm",
+        "request_max_limit": 10,
+        "request_reset_duration": "1m",
+        "token_max_limit": 15000,
+        "token_reset_duration": "1m"
+      }
+    ],
+    "routing_rules": [
+      {
+        "id": "route-by-model",
+        "name": "Route GPT-4 to Azure",
+        "description": "Send all GPT-4 requests to Azure OpenAI",
+        "enabled": false,
+        "cel_expression": "request.model.contains('gpt-4')",
+        "targets": [
+          {
+            "provider": "azure",
+            "model": "gpt-4",
+            "weight": 1.0,
+            "key_id": " "
+          }
+        ],
+        "scope": "global",
+        "scope_id": null,
+        "fallbacks": [],
+        "priority": 1,
+        "query": {}
+      },
+      {
+        "id": "route-by-vk",
+        "name": "Premium team gets better models",
+        "enabled": false,
+        "cel_expression": "team.id == 'team-premium'",
+        "targets": [
+          {
+            "provider": "openai",
+            "model": "gpt-4-turbo",
+            "weight": 1.0
+          }
+        ],
+        "scope": "virtual_key",
+        "scope_id": "virtual_key-premium",
+        "fallbacks": [],
+        "priority": 1,
+        "query": {}
+      }
+    ],
+    "model_configs": [
+      {
+        "id": "config-gpt4",
+        "model_name": "gpt-4-turbo",
+        "provider": "openai",
+        "rate_limit_id": "rate-limit-40rpm"
+      }
+    ],
+    "providers": [
+      {
+        "name": "nvidia-nim",
+        "store_raw_request_response": true,
+        "rate_limit_id": "rate-limit-40rpm",
+        "network_config": {
+          "base_url": "https://integrate.api.nvidia.com",
+          "default_request_timeout_in_seconds": 120,
+          "max_retries": 5,
+          "retry_backoff_initial": 35,
+          "retry_backoff_max": 40
+        },
+        "custom_provider_config": {
+          "base_provider_type": "openai",
+          "is_key_less": false,
+          "allowed_requests": {
+            "chat_completion": true,
+            "embedding": true
+          }
+        },
+        "keys": [
+          {
+            "name": "nim",
+            "value": "env.NVIDIA_NIM_API_KEY",
+            "models": [
+              "z-ai/glm4.7",
+              "qwen/qwen3-coder-480b-a35b-instruct",
+              "qwen/qwen3.5-122b-a10b",
+              "qwen/qwen3.5-397b-a17b",
+              "nvidia/nv-embed-v1",
+              "nvidia/nv-embedcode-7b-v1",
+              "google/gemma-3-27b-it",
+              "deepseek-ai/deepseek-v3.2",
+              "deepseek-ai/deepseek-v3.1-terminus",
+              "stepfun-ai/step-3.5-flash",
+              "nvidia/nemotron-3-super-120b-a12b",
+              "nvidia/nemotron-3-nano-30b-a3b",
+              "moonshotai/kimi-k2.5",
+              "google/gemma-4-31b-it"
+            ],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-glm5-key",
+            "value": "env.NIM_GLM_API_KEY",
+            "models": ["z-ai/glm5"],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-mmx-key",
+            "value": "env.NIM_MINIMAX_API_KEY",
+            "models": ["minimaxai/minimax-m2.5"],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-kimi-k2t-key",
+            "value": "env.NIM_KIMIK2T_API_KEY",
+            "models": ["moonshotai/kimi-k2-thinking"],
+            "weight": 1.0
+          },
+          {
+            "name": "nim-kimi-k2i-key",
+            "value": "env.NIM_KIMIK2I_API_KEY",
+            "models": ["moonshotai/kimi-k2-instruct"],
+            "weight": 1.0
+          }
+        ]
+      }
+    ],
+    "virtual_keys": [
+      {
+        "id": "vk-chat-engine",
+        "name": "ChatEngine",
+        "description": "Routes requests for chat-engine group",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["stepfun-ai/step-3.5-flash"],
+            "id": 0,
+            "keys": [],
+            "rate_limit_id": ""
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["moonshotai/kimi-k2.5"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["nvidia/nemotron-3-super-120b-a12b"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["qwen/qwen3.5-122b-a10b"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["z-ai/glm4.7"]
+          }
+        ]
+      },
+      {
+        "id": "qwen3-coder-480b-a35b-instruct",
+        "name": "qwen3-coder",
+        "value": "sk-bf-061958f1-4b7e-4263-b2b0-2740857d5fa1",
+        "is_active": true,
+        "rate_limit_id": "",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["qwen/qwen3-coder-480b-a35b-instruct"]
+          }
+        ]
+      },
+      {
+        "id": "vk-coding-engine",
+        "name": "CodingEngine",
+        "description": "Routes requests for coding-engine group",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["qwen/qwen3-coder-480b-a35b-instruct"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["z-ai/glm5"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["qwen/qwen3.5-397b-a17b"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["qwen/qwen3.5-122b-a10b"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["z-ai/glm4.7"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["nvidia/nemotron-3-super-120b-a12b"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["minimaxai/minimax-m2.5"]
+          }
+        ]
+      },
+      {
+        "id": "vk-small-engine",
+        "name": "SmallEngine",
+        "description": "Routes requests for coding-engine group",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["nvidia/nemotron-3-nano-30b-a3b"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["moonshotai/kimi-k2-thinking"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["qwen/qwen3.5-122b-a10b"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["google/gemma-3-27b-it"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["google/gemma-4-31b-it"]
+          }
+        ]
+      },
+      {
+        "id": "vk-tool-engine",
+        "name": "ToolEngine",
+        "description": "Routes requests for text-embed-engine group",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["minimaxai/minimax-m2.5"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["deepseek-ai/deepseek-v3.1-terminus"]
+          },
+          {
+            "provider": "nvidia-nim",
+            "weight": 0.0,
+            "allowed_models": ["nvidia/nemotron-3-super-120b-a12b"]
+          }
+        ]
+      },
+      {
+        "id": "vk-embeddding-engine",
+        "name": "EmbedEngine",
+        "description": "Routes requests for text-embed-engine group",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["nvidia/nv-embed-v1"]
+          }
+        ]
+      },
+      {
+        "id": "vk-code-embeddding-engine",
+        "name": "CodeEmbedEngine",
+        "description": "Routes requests for code-embed-engine group",
+        "provider_configs": [
+          {
+            "provider": "nvidia-nim",
+            "weight": 1.0,
+            "allowed_models": ["nvidia/nv-embedcode-7b-v1"]
+          }
+        ]
+      },
+      {
+        "id": "vk-gemini-researcher",
+        "name": "Gemini Grounded Research",
+        "provider_configs": [
+          {
+            "provider": "google",
+            "allowed_models": [
+              "gemini-3.1-flash-lite-preview",
+              "gemini-3-flash-preview"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "enabled": true,
+      "name": "semantic_cache",
+      "config": {
+        "provider": "nvidia-nim",
+        "keys": ["env.NVIDIA_NIM_API_KEY"],
+        "embedding_model": "nvidia/nv-embed-v1",
+        "dimension": 1024,
+        "cleanup_on_shutdown": true,
+        "ttl": "10m",
+        "threshold": 0.82,
+        "conversation_history_threshold": 2,
+        "cache_by_model": true,
+        "cache_by_provider": true,
+        "exclude_system_prompt": false
+      }
+    }
+  ],
+  "vector_store": {
+    "enabled": true,
+    "type": "qdrant",
+    "config": {
+      "host": "localhost",
+      "port": 6334,
+      "api_key": "env.YOUR_API_KEY_HERE"
+    }
+  },
+  "providers": {
+    "nvidia-nim": {
+      "keys": [
+        {
+          "name": "nim",
+          "value": "env.NVIDIA_NIM_API_KEY",
+          "models": [
+            "z-ai/glm4.7",
+            "qwen/qwen3-coder-480b-a35b-instruct",
+            "qwen/qwen3.5-122b-a10b",
+            "nvidia/nv-embed-v1",
+            "nvidia/nv-embedcode-7b-v1",
+            "google/gemma-3-27b-it",
+            "google/gemma-4-31b-it",
+            "deepseek-ai/deepseek-v3.2",
+            "deepseek-ai/deepseek-v3.1-terminus"
+          ],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-glm5-key",
+          "value": "env.NIM_GLM_API_KEY",
+          "models": ["z-ai/glm5"],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-minimax-key",
+          "value": "env.NIM_MINIMAX_API_KEY",
+          "models": ["minimaxai/minimax-m2.5"],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-kimi-k2i-key",
+          "value": "env.NIM_KIMIK2I_API_KEY",
+          "models": ["moonshotai/kimi-k2-instruct"],
+          "weight": 1.0
+        },
+        {
+          "name": "nim-kimi-k2t-key",
+          "value": "env.NIM_KIMIK2T_API_KEY",
+          "models": ["moonshotai/kimi-k2-thinking"],
+          "weight": 1.0
+        }
+      ],
+      "network_config": {
+        "base_url": "https://integrate.api.nvidia.com",
+        "default_request_timeout_in_seconds": 120,
+        "max_retries": 3
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "is_key_less": false,
+        "allowed_requests": {
+          "chat_completion": true,
+          "embedding": true
+        }
+      },
+      "store_raw_request_response": true
+    }
+  }
+}

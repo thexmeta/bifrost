@@ -1591,6 +1591,13 @@ func updateGovernanceConfigInStore(
 			}
 			for j := range providerConfigs {
 				providerConfigs[j].VirtualKeyID = virtualKey.ID
+				// Normalize empty strings to nil for optional FK fields to prevent FK constraint failures
+				if providerConfigs[j].RateLimitID != nil && *providerConfigs[j].RateLimitID == "" {
+					providerConfigs[j].RateLimitID = nil
+				}
+				if providerConfigs[j].BudgetID != nil && *providerConfigs[j].BudgetID == "" {
+					providerConfigs[j].BudgetID = nil
+				}
 				if err := config.ConfigStore.CreateVirtualKeyProviderConfig(ctx, &providerConfigs[j], tx); err != nil {
 					return fmt.Errorf("failed to create provider config for virtual key %s: %w", virtualKey.ID, err)
 				}
@@ -1766,6 +1773,14 @@ func createGovernanceConfigInStore(ctx context.Context, config *Config) {
 
 			for _, pc := range providerConfigs {
 				pc.VirtualKeyID = virtualKey.ID
+				// Normalize empty strings to nil for optional FK fields to prevent FK constraint failures
+				// This handles config.json files that use "" instead of null/omitted for optional fields
+				if pc.RateLimitID != nil && *pc.RateLimitID == "" {
+					pc.RateLimitID = nil
+				}
+				if pc.BudgetID != nil && *pc.BudgetID == "" {
+					pc.BudgetID = nil
+				}
 				logger.Debug("creating provider config for VK %s: provider=%s, keys=%d", virtualKey.ID, pc.Provider, len(pc.Keys))
 				if err := config.ConfigStore.CreateVirtualKeyProviderConfig(ctx, &pc, tx); err != nil {
 					logger.Error("failed to create provider config for virtual key %s: %v", virtualKey.ID, err)
@@ -2496,6 +2511,13 @@ func reconcileVirtualKeyAssociations(
 	for _, newPC := range newProviderConfigs {
 		newProviderSet[newPC.Provider] = true
 		newPC.VirtualKeyID = vkID
+		// Normalize empty strings to nil for optional FK fields to prevent FK constraint failures
+		if newPC.RateLimitID != nil && *newPC.RateLimitID == "" {
+			newPC.RateLimitID = nil
+		}
+		if newPC.BudgetID != nil && *newPC.BudgetID == "" {
+			newPC.BudgetID = nil
+		}
 		if existing, found := existingByProvider[newPC.Provider]; found {
 			// Update existing provider config from file
 			existing.Weight = newPC.Weight
@@ -3168,6 +3190,1316 @@ func (c *Config) SetPluginOrderInfo(name string, placement *schemas.PluginPlacem
 	}
 
 	c.pluginOrderMap[name] = pluginOrderInfo{Placement: p, Order: o}
+}
+
+// SortAndRebuildPlugins sorts BasePlugins by placement group then order, and rebuilds caches.
+// Placement groups execute in order: pre_builtin → builtin → post_builtin.
+// Within each group, plugins are sorted by order (lower = earlier). Ties preserve registration order (stable sort).
+func (c *Config) SortAndRebuildPlugins() {
+	c.pluginsMu.Lock()
+	defer c.pluginsMu.Unlock()
+
+	oldPlugins := c.BasePlugins.Load()
+	if oldPlugins == nil || len(*oldPlugins) == 0 {
+		return
+	}
+
+	sorted := make([]schemas.BasePlugin, len(*oldPlugins))
+	copy(sorted, *oldPlugins)
+
+	groupRank := map[schemas.PluginPlacement]int{
+		schemas.PluginPlacementPreBuiltin:  0,
+		schemas.PluginPlacementBuiltin:     1,
+		schemas.PluginPlacementPostBuiltin: 2,
+	}
+	defaultRank := 2 // Unknown placements default to post_builtin (least privileged)
+
+	sort.SliceStable(sorted, func(i, j int) bool {
+		iInfo := c.pluginOrderMap[sorted[i].GetName()]
+		jInfo := c.pluginOrderMap[sorted[j].GetName()]
+		iRank, iOk := groupRank[iInfo.Placement]
+		if !iOk {
+			iRank = defaultRank
+		}
+		jRank, jOk := groupRank[jInfo.Placement]
+		if !jOk {
+			jRank = defaultRank
+		}
+		if iRank != jRank {
+			return iRank < jRank
+		}
+		return iInfo.Order < jInfo.Order
+	})
+
+	c.BasePlugins.Store(&sorted)
+	c.rebuildInterfaceCaches()
+}
+
+// FindPluginAs finds a plugin by name in the given config and returns it as type T
+// Returns error if plugin not found or doesn't implement T
+// This is a type-safe finder that eliminates manual type assertions
+// Usage: plugin, err := lib.FindPluginAs[*mypackage.MyPluginType](config, "plugin-name")
+func FindPluginAs[T any](c *Config, name string) (T, error) {
+	var zero T
+
+	basePlugins := c.BasePlugins.Load()
+	if basePlugins == nil {
+		return zero, fmt.Errorf("plugin %s not found", name)
+	}
+
+	for _, p := range *basePlugins {
+		if p.GetName() == name {
+			if typed, ok := p.(T); ok {
+				return typed, nil
+			}
+			return zero, fmt.Errorf("plugin %s does not implement required interface", name)
+		}
+	}
+
+	return zero, fmt.Errorf("plugin %s not found", name)
+}
+
+// FindLLMPlugin is a convenience wrapper for finding LLM plugins
+func (c *Config) FindLLMPlugin(name string) (schemas.LLMPlugin, error) {
+	return FindPluginAs[schemas.LLMPlugin](c, name)
+}
+
+// FindMCPPlugin is a convenience wrapper for finding MCP plugins
+func (c *Config) FindMCPPlugin(name string) (schemas.MCPPlugin, error) {
+	return FindPluginAs[schemas.MCPPlugin](c, name)
+}
+
+// FindPluginByName returns a plugin as BasePlugin
+// For most cases, use FindPluginAs[T] for type-safe access
+func (c *Config) FindPluginByName(name string) (schemas.BasePlugin, error) {
+	return FindPluginAs[schemas.BasePlugin](c, name)
+}
+
+// GetProviderConfigRedacted retrieves a provider configuration with sensitive values redacted.
+// This method is intended for external API responses and logging.
+//
+// The returned configuration has sensitive values redacted:
+// - API keys are redacted using RedactKey()
+// - Values from environment variables show the original env var name (env.VAR_NAME)
+//
+// Returns a new copy with redacted values that is safe to expose externally.
+func (c *Config) GetProviderConfigRedacted(provider schemas.ModelProvider) (*configstore.ProviderConfig, error) {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	config, exists := c.Providers[provider]
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	return config.Redacted(), nil
+}
+
+// GetProviderKeysRaw retrieves the raw keys configured for a provider.
+func (c *Config) GetProviderKeysRaw(provider schemas.ModelProvider) ([]schemas.Key, error) {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	config, exists := c.Providers[provider]
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	keys := append([]schemas.Key(nil), config.Keys...)
+	return keys, nil
+}
+
+// GetProviderKeysRedacted retrieves redacted keys configured for a provider.
+func (c *Config) GetProviderKeysRedacted(provider schemas.ModelProvider) ([]schemas.Key, error) {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	config, exists := c.Providers[provider]
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	return append([]schemas.Key(nil), config.Redacted().Keys...), nil
+}
+
+// GetProviderKeyRaw retrieves a single raw key configured for a provider.
+func (c *Config) GetProviderKeyRaw(provider schemas.ModelProvider, keyID string) (*schemas.Key, error) {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	config, exists := c.Providers[provider]
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	index := slices.IndexFunc(config.Keys, func(key schemas.Key) bool {
+		return key.ID == keyID
+	})
+	if index == -1 {
+		return nil, ErrNotFound
+	}
+
+	key := config.Keys[index]
+	return &key, nil
+}
+
+// GetProviderKeyRedacted retrieves a single redacted key configured for a provider.
+func (c *Config) GetProviderKeyRedacted(provider schemas.ModelProvider, keyID string) (*schemas.Key, error) {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	config, exists := c.Providers[provider]
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	redacted := config.Redacted()
+	index := slices.IndexFunc(redacted.Keys, func(key schemas.Key) bool {
+		return key.ID == keyID
+	})
+	if index == -1 {
+		return nil, ErrNotFound
+	}
+
+	key := redacted.Keys[index]
+	return &key, nil
+}
+
+// GetAllProviders returns all configured provider names.
+func (c *Config) GetAllProviders() ([]schemas.ModelProvider, error) {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	providers := make([]schemas.ModelProvider, 0, len(c.Providers))
+	for provider := range c.Providers {
+		providers = append(providers, provider)
+	}
+
+	return providers, nil
+}
+
+// AddProvider adds a new provider configuration to memory with full environment variable
+// processing. This method is called when new providers are added via the HTTP API.
+//
+// The method:
+//   - Validates that the provider doesn't already exist
+//   - Processes environment variables in API keys, and key-level configs
+//   - Stores the processed configuration in memory
+//   - Updates metadata and timestamps
+func (c *Config) AddProvider(ctx context.Context, provider schemas.ModelProvider, config configstore.ProviderConfig) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+	// Check if provider already exists
+	if _, exists := c.Providers[provider]; exists {
+		return fmt.Errorf("provider %s: %w", provider, ErrAlreadyExists)
+	}
+	// Validate CustomProviderConfig if present
+	if err := ValidateCustomProvider(config, provider); err != nil {
+		return err
+	}
+	for i, key := range config.Keys {
+		if key.ID == "" {
+			config.Keys[i].ID = uuid.NewString()
+		}
+	}
+	// First add the provider to the store
+	skipDBUpdate := false
+	if ctx.Value(schemas.BifrostContextKeySkipDBUpdate) != nil {
+		if skip, ok := ctx.Value(schemas.BifrostContextKeySkipDBUpdate).(bool); ok {
+			skipDBUpdate = skip
+		}
+	}
+	if c.ConfigStore != nil && !skipDBUpdate {
+		if err := c.ConfigStore.AddProvider(ctx, provider, config); err != nil {
+			if errors.Is(err, configstore.ErrNotFound) {
+				return ErrNotFound
+			}
+			// If the provider already exists in the DB (e.g., from a previous failed attempt)
+			// but not in the in-memory map, sync it to memory and return ErrAlreadyExists
+			// so the caller can proceed with an update instead of failing.
+			if errors.Is(err, configstore.ErrAlreadyExists) {
+				// Provider already exists in DB but not in memory - sync and return
+				c.Providers[provider] = config
+				logger.Info("provider %s already exists in DB, synced to memory", provider)
+				return fmt.Errorf("provider/provider key name %s: %w", provider, ErrAlreadyExists)
+			}
+			return fmt.Errorf("failed to update provider config in store: %w", err)
+		}
+	}
+	c.Providers[provider] = config
+	logger.Info("added provider: %s", provider)
+	return nil
+}
+
+// UpdateProviderConfig updates a provider configuration in memory with full environment
+// variable processing. This method is called when provider configurations are modified
+// via the HTTP API and ensures all data processing is done upfront.
+//
+// The method:
+//   - Processes environment variables in API keys, and key-level configs
+//   - Stores the processed configuration in memory
+//   - Updates metadata and timestamps
+//   - Thread-safe operation with write locks
+//
+// Note: Environment variable cleanup for deleted/updated keys is now handled automatically
+// by the mergeKeys function before this method is called.
+//
+// Parameters:
+//   - provider: The provider to update
+//   - config: The new configuration
+func (c *Config) UpdateProviderConfig(ctx context.Context, provider schemas.ModelProvider, config configstore.ProviderConfig) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+	// Get existing configuration for validation
+	existingConfig, exists := c.Providers[provider]
+	if !exists {
+		return ErrNotFound
+	}
+	// Validate CustomProviderConfig if present, ensuring immutable fields are not changed
+	if err := ValidateCustomProviderUpdate(config, existingConfig, provider); err != nil {
+		return err
+	}
+	// Preserve the existing ConfigHash - this is the original hash from config.json
+	// and must be retained so that on server restart, the hash comparison works correctly
+	// and user's key value changes are preserved (not overwritten by config.json)
+	config.ConfigHash = existingConfig.ConfigHash
+	// Update in-memory configuration first (so client can read updated config)
+	c.Providers[provider] = config
+	for i, key := range config.Keys {
+		if key.ID == "" {
+			config.Keys[i].ID = uuid.NewString()
+		}
+	}
+	skipDBUpdate := false
+	if ctx.Value(schemas.BifrostContextKeySkipDBUpdate) != nil {
+		if skip, ok := ctx.Value(schemas.BifrostContextKeySkipDBUpdate).(bool); ok {
+			skipDBUpdate = skip
+		}
+	}
+	if c.ConfigStore != nil && !skipDBUpdate {
+		// Process environment variables in keys (including key-level configs)
+		// Update provider in database within a transaction
+		dbErr := c.ConfigStore.ExecuteTransaction(ctx, func(tx *gorm.DB) error {
+			if err := c.ConfigStore.UpdateProvider(ctx, provider, config, tx); err != nil {
+				if errors.Is(err, configstore.ErrNotFound) {
+					return ErrNotFound
+				}
+				return fmt.Errorf("failed to update provider config in store: %w", err)
+			}
+			return nil
+		})
+		if dbErr != nil {
+			// Rollback in-memory changes if database transaction failed
+			c.Providers[provider] = existingConfig
+			return dbErr
+		}
+	}
+	// Release lock before calling client.UpdateProvider to avoid deadlock
+	// client.UpdateProvider will call GetConfigForProvider which needs RLock
+	c.Mu.Unlock()
+
+	// Update client provider - this may acquire its own locks
+	clientErr := c.client.UpdateProvider(provider)
+
+	// Re-acquire lock for cleanup (defer will unlock at function return)
+	c.Mu.Lock()
+
+	if clientErr != nil {
+		// Rollback in-memory changes if client update failed and the current config is still the one this call applied to
+		if reflect.DeepEqual(c.Providers[provider], config) {
+			c.Providers[provider] = existingConfig
+		}
+		// If database was updated, we can't rollback the transaction here
+		// but the in-memory state will be consistent
+		return fmt.Errorf("failed to update provider: %w", clientErr)
+	}
+
+	logger.Info("Updated configuration for provider: %s", provider)
+	return nil
+}
+
+// AddProviderKey adds a new key to an existing provider configuration.
+func (c *Config) AddProviderKey(ctx context.Context, provider schemas.ModelProvider, key schemas.Key) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+
+	existingConfig, exists := c.Providers[provider]
+	if !exists {
+		return ErrNotFound
+	}
+
+	if key.ID == "" {
+		key.ID = uuid.NewString()
+	}
+
+	updatedConfig := existingConfig
+	updatedConfig.Keys = append(append([]schemas.Key(nil), existingConfig.Keys...), key)
+
+	skipDBUpdate := false
+	if ctx.Value(schemas.BifrostContextKeySkipDBUpdate) != nil {
+		if skip, ok := ctx.Value(schemas.BifrostContextKeySkipDBUpdate).(bool); ok {
+			skipDBUpdate = skip
+		}
+	}
+	if c.ConfigStore != nil && !skipDBUpdate {
+		if err := c.ConfigStore.CreateProviderKey(ctx, provider, key); err != nil {
+			if errors.Is(err, configstore.ErrNotFound) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("failed to create provider key in store: %w", err)
+		}
+	}
+
+	c.Providers[provider] = updatedConfig
+
+	c.Mu.Unlock()
+	clientErr := c.client.UpdateProvider(provider)
+	c.Mu.Lock()
+
+	if clientErr != nil {
+		if reflect.DeepEqual(c.Providers[provider], updatedConfig) {
+			c.Providers[provider] = existingConfig
+		}
+		return fmt.Errorf("failed to update provider: %w", clientErr)
+	}
+
+	logger.Info("Added key %s to provider: %s", key.ID, provider)
+	return nil
+}
+
+// UpdateProviderKey updates a single key on an existing provider configuration.
+func (c *Config) UpdateProviderKey(ctx context.Context, provider schemas.ModelProvider, keyID string, key schemas.Key) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+
+	existingConfig, exists := c.Providers[provider]
+	if !exists {
+		return ErrNotFound
+	}
+
+	index := slices.IndexFunc(existingConfig.Keys, func(existingKey schemas.Key) bool {
+		return existingKey.ID == keyID
+	})
+	if index == -1 {
+		return ErrNotFound
+	}
+
+	updatedConfig := existingConfig
+	updatedConfig.Keys = append([]schemas.Key(nil), existingConfig.Keys...)
+	key.ID = keyID
+	updatedConfig.Keys[index] = key
+
+	skipDBUpdate := false
+	if ctx.Value(schemas.BifrostContextKeySkipDBUpdate) != nil {
+		if skip, ok := ctx.Value(schemas.BifrostContextKeySkipDBUpdate).(bool); ok {
+			skipDBUpdate = skip
+		}
+	}
+	if c.ConfigStore != nil && !skipDBUpdate {
+		if err := c.ConfigStore.UpdateProviderKey(ctx, provider, keyID, key); err != nil {
+			if errors.Is(err, configstore.ErrNotFound) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("failed to update provider key in store: %w", err)
+		}
+	}
+
+	c.Providers[provider] = updatedConfig
+
+	c.Mu.Unlock()
+	clientErr := c.client.UpdateProvider(provider)
+	c.Mu.Lock()
+
+	if clientErr != nil {
+		if reflect.DeepEqual(c.Providers[provider], updatedConfig) {
+			c.Providers[provider] = existingConfig
+		}
+		return fmt.Errorf("failed to update provider: %w", clientErr)
+	}
+
+	logger.Info("Updated key %s for provider: %s", keyID, provider)
+	return nil
+}
+
+// RemoveProviderKey removes a single key from an existing provider configuration.
+func (c *Config) RemoveProviderKey(ctx context.Context, provider schemas.ModelProvider, keyID string) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+
+	existingConfig, exists := c.Providers[provider]
+	if !exists {
+		return ErrNotFound
+	}
+
+	index := slices.IndexFunc(existingConfig.Keys, func(existingKey schemas.Key) bool {
+		return existingKey.ID == keyID
+	})
+	if index == -1 {
+		return ErrNotFound
+	}
+
+	updatedConfig := existingConfig
+	updatedConfig.Keys = append([]schemas.Key(nil), existingConfig.Keys[:index]...)
+	updatedConfig.Keys = append(updatedConfig.Keys, existingConfig.Keys[index+1:]...)
+
+	skipDBUpdate := false
+	if ctx.Value(schemas.BifrostContextKeySkipDBUpdate) != nil {
+		if skip, ok := ctx.Value(schemas.BifrostContextKeySkipDBUpdate).(bool); ok {
+			skipDBUpdate = skip
+		}
+	}
+	if c.ConfigStore != nil && !skipDBUpdate {
+		if err := c.ConfigStore.DeleteProviderKey(ctx, provider, keyID); err != nil {
+			if errors.Is(err, configstore.ErrNotFound) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("failed to delete provider key from store: %w", err)
+		}
+	}
+
+	c.Providers[provider] = updatedConfig
+
+	c.Mu.Unlock()
+	clientErr := c.client.UpdateProvider(provider)
+	c.Mu.Lock()
+
+	if clientErr != nil {
+		if reflect.DeepEqual(c.Providers[provider], updatedConfig) {
+			c.Providers[provider] = existingConfig
+		}
+		return fmt.Errorf("failed to update provider: %w", clientErr)
+	}
+
+	logger.Info("Removed key %s from provider: %s", keyID, provider)
+	return nil
+}
+
+// RemoveProvider removes a provider configuration from memory.
+func (c *Config) RemoveProvider(ctx context.Context, provider schemas.ModelProvider) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+	// Delete from DB first to avoid memory/DB inconsistency if DB delete fails
+	skipDBUpdate := false
+	if ctx.Value(schemas.BifrostContextKeySkipDBUpdate) != nil {
+		if skip, ok := ctx.Value(schemas.BifrostContextKeySkipDBUpdate).(bool); ok {
+			skipDBUpdate = skip
+		}
+	}
+	if c.ConfigStore != nil && !skipDBUpdate {
+		if err := c.ConfigStore.DeleteProvider(ctx, provider); err != nil {
+			return fmt.Errorf("failed to delete provider config from store: %w", err)
+		}
+	}
+	if _, exists := c.Providers[provider]; !exists {
+		return nil
+	}
+	delete(c.Providers, provider)
+	logger.Info("Removed provider: %s", provider)
+	return nil
+}
+
+// GetAllKeys returns the redacted keys
+func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	keys := make([]configstoreTables.TableKey, 0)
+	for providerKey, provider := range c.Providers {
+		for _, key := range provider.Keys {
+			models := key.Models
+			if models == nil {
+				models = []string{}
+			}
+			blacklisted := key.BlacklistedModels
+			if blacklisted == nil {
+				blacklisted = []string{}
+			}
+			configStoreKey := configstoreTables.TableKey{
+				KeyID:             key.ID,
+				Name:              key.Name,
+				Value:             *key.Value.Redacted(),
+				Models:            models,
+				BlacklistedModels: blacklisted,
+				Weight:            bifrost.Ptr(key.Weight),
+				Provider:          string(providerKey),
+				ConfigHash:        key.ConfigHash,
+			}
+			if key.AzureKeyConfig != nil {
+				cfg := *key.AzureKeyConfig // safe copy
+				cfg.Endpoint = *cfg.Endpoint.Redacted()
+				cfg.ClientID = cfg.ClientID.Redacted()
+				cfg.ClientSecret = cfg.ClientSecret.Redacted()
+				cfg.TenantID = cfg.TenantID.Redacted()
+				configStoreKey.AzureKeyConfig = &cfg
+			}
+			if key.BedrockKeyConfig != nil {
+				cfg := *key.BedrockKeyConfig // safe copy
+				cfg.ARN = key.BedrockKeyConfig.ARN.Redacted()
+				cfg.AccessKey = *cfg.AccessKey.Redacted()
+				cfg.ExternalID = cfg.ExternalID.Redacted()
+				cfg.Region = cfg.Region.Redacted()
+				cfg.RoleARN = cfg.RoleARN.Redacted()
+				cfg.RoleSessionName = cfg.RoleSessionName.Redacted()
+				cfg.SecretKey = *cfg.SecretKey.Redacted()
+				cfg.SessionToken = cfg.SessionToken.Redacted()
+				configStoreKey.BedrockKeyConfig = &cfg
+			}
+			if key.VertexKeyConfig != nil {
+				cfg := *key.VertexKeyConfig // safe copy
+				cfg.ProjectID = *cfg.ProjectID.Redacted()
+				cfg.ProjectNumber = *cfg.ProjectNumber.Redacted()
+				cfg.Region = *cfg.Region.Redacted()
+				cfg.AuthCredentials = *cfg.AuthCredentials.Redacted()
+				configStoreKey.VertexKeyConfig = &cfg
+			}
+			if key.ReplicateKeyConfig != nil {
+				configStoreKey.ReplicateKeyConfig = key.ReplicateKeyConfig
+			}
+			if key.VLLMKeyConfig != nil {
+				cfg := *key.VLLMKeyConfig // safe copy
+				cfg.URL = *cfg.URL.Redacted()
+				configStoreKey.VLLMKeyConfig = &cfg
+			}
+			if key.OllamaKeyConfig != nil {
+				cfg := *key.OllamaKeyConfig // safe copy
+				cfg.URL = *cfg.URL.Redacted()
+				configStoreKey.OllamaKeyConfig = &cfg
+			}
+			if key.SGLKeyConfig != nil {
+				cfg := *key.SGLKeyConfig // safe copy
+				cfg.URL = *cfg.URL.Redacted()
+				configStoreKey.SGLKeyConfig = &cfg
+			}
+			keys = append(keys, configStoreKey)
+		}
+	}
+
+	return keys, nil
+}
+
+// SetBifrostClient sets the Bifrost client in the store.
+// This is used to allow the store to access the Bifrost client.
+// This is useful for the MCP handler to access the Bifrost client.
+func (c *Config) SetBifrostClient(client *bifrost.Bifrost) {
+	c.muMCP.Lock()
+	defer c.muMCP.Unlock()
+
+	c.client = client
+}
+
+// GetMCPClient gets an MCP client configuration from the configuration.
+// This method is called when an MCP client is reconnected via the HTTP API.
+//
+// Parameters:
+//   - id: ID of the client to get
+//
+// Returns:
+//   - *schemas.MCPClientConfig: The MCP client configuration (not redacted)
+//   - error: Any retrieval error
+func (c *Config) GetMCPClient(id string) (*schemas.MCPClientConfig, error) {
+	c.muMCP.RLock()
+	defer c.muMCP.RUnlock()
+
+	if c.client == nil {
+		return nil, fmt.Errorf("bifrost client not set")
+	}
+
+	if c.MCPConfig == nil {
+		return nil, fmt.Errorf("no MCP config found")
+	}
+
+	for _, clientConfig := range c.MCPConfig.ClientConfigs {
+		if clientConfig.ID == id {
+			return clientConfig, nil
+		}
+	}
+
+	return nil, fmt.Errorf("MCP client '%s' not found", id)
+}
+
+// AddMCPClient adds a new MCP client to the configuration.
+// This method is called when a new MCP client is added via the HTTP API.
+//
+// The method:
+//   - Validates that the MCP client doesn't already exist
+//   - Processes environment variables in the MCP client configuration
+//   - Stores the processed configuration in memory
+func (c *Config) AddMCPClient(ctx context.Context, clientConfig *schemas.MCPClientConfig) error {
+	if c.client == nil {
+		return fmt.Errorf("bifrost client not set")
+	}
+	c.muMCP.Lock()
+	defer c.muMCP.Unlock()
+	if c.MCPConfig == nil {
+		c.MCPConfig = &schemas.MCPConfig{}
+	}
+	// Track new environment variables
+	c.MCPConfig.ClientConfigs = append(c.MCPConfig.ClientConfigs, clientConfig)
+	// Config with processed env vars
+	if err := c.client.AddMCPClient(clientConfig); err != nil {
+		c.MCPConfig.ClientConfigs = c.MCPConfig.ClientConfigs[:len(c.MCPConfig.ClientConfigs)-1]
+		return fmt.Errorf("failed to connect MCP client: %w", err)
+	}
+	// Update MCP catalog pricing data for the new client
+	if c.MCPCatalog != nil && c.ConfigStore != nil {
+		// Get the created client config from store to get tool_pricing
+		dbClientConfig, err := c.ConfigStore.GetMCPClientByName(ctx, clientConfig.Name)
+		if err != nil {
+			logger.Warn("failed to get MCP client config for catalog update: %v", err)
+		} else if dbClientConfig != nil {
+			for toolName, costPerExecution := range dbClientConfig.ToolPricing {
+				c.MCPCatalog.UpdatePricingData(dbClientConfig.Name, toolName, costPerExecution)
+			}
+			logger.Debug("updated MCP catalog pricing for client: %s (%d tools)", dbClientConfig.Name, len(dbClientConfig.ToolPricing))
+		}
+	}
+	return nil
+}
+
+// UpdateMCPClient edits an MCP client configuration.
+// This allows for dynamic MCP client management at runtime with proper env var handling.
+//
+// Parameters:
+//   - id: ID of the client to edit
+//   - updatedConfig: Updated MCP client configuration
+func (c *Config) UpdateMCPClient(ctx context.Context, id string, updatedConfig *schemas.MCPClientConfig) error {
+	if c.client == nil {
+		return fmt.Errorf("bifrost client not set")
+	}
+	c.muMCP.Lock()
+	defer c.muMCP.Unlock()
+
+	if c.MCPConfig == nil {
+		return fmt.Errorf("no MCP config found")
+	}
+	// Find the existing client config
+	var oldConfig *schemas.MCPClientConfig
+	var found bool
+	var configIndex int
+	for i, clientConfig := range c.MCPConfig.ClientConfigs {
+		if clientConfig.ID == id {
+			oldConfig = clientConfig
+			configIndex = i
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("MCP client '%s' not found", id)
+	}
+	// Check if client is registered in Bifrost (can be not registered if client initialization failed)
+	if clients, err := c.client.GetMCPClients(); err == nil && len(clients) > 0 {
+		for _, client := range clients {
+			if client.Config.ID == id {
+				if err := c.client.UpdateMCPClient(id, updatedConfig); err != nil {
+					// Rollback in-memory changes
+					c.MCPConfig.ClientConfigs[configIndex] = oldConfig
+					return fmt.Errorf("failed to edit MCP client: %w", err)
+				}
+				break
+			}
+		}
+	}
+	// Update MCP catalog pricing data for the edited client
+	if c.MCPCatalog != nil {
+		// If the client name has changed, delete all old pricing entries under the old name
+		if updatedConfig.Name != oldConfig.Name {
+			for toolName := range oldConfig.ToolPricing {
+				c.MCPCatalog.DeletePricingData(oldConfig.Name, toolName)
+			}
+			logger.Debug("deleted old MCP catalog pricing for renamed client: %s -> %s (%d tools)", oldConfig.Name, updatedConfig.Name, len(oldConfig.ToolPricing))
+		} else {
+			// If name hasn't changed, remove pricing entries that were deleted
+			for toolName := range oldConfig.ToolPricing {
+				if _, exists := updatedConfig.ToolPricing[toolName]; !exists {
+					c.MCPCatalog.DeletePricingData(updatedConfig.Name, toolName)
+				}
+			}
+		}
+		// Then, add or update pricing entries from the new config (with new name if changed)
+		for toolName, costPerExecution := range updatedConfig.ToolPricing {
+			c.MCPCatalog.UpdatePricingData(updatedConfig.Name, toolName, costPerExecution)
+		}
+		logger.Debug("updated MCP catalog pricing for client: %s (%d tools)", updatedConfig.Name, len(updatedConfig.ToolPricing))
+	}
+	// Update the in-memory configuration with only the fields that were changed
+	// Preserve connection info (connection_type, connection_string, stdio_config) from oldConfig
+	// as these are read-only and not sent in the update request
+	c.MCPConfig.ClientConfigs[configIndex].Name = updatedConfig.Name
+	c.MCPConfig.ClientConfigs[configIndex].IsCodeModeClient = updatedConfig.IsCodeModeClient
+	c.MCPConfig.ClientConfigs[configIndex].Headers = updatedConfig.Headers
+	c.MCPConfig.ClientConfigs[configIndex].ToolsToExecute = updatedConfig.ToolsToExecute
+	c.MCPConfig.ClientConfigs[configIndex].ToolsToAutoExecute = updatedConfig.ToolsToAutoExecute
+	c.MCPConfig.ClientConfigs[configIndex].AllowedExtraHeaders = updatedConfig.AllowedExtraHeaders
+	c.MCPConfig.ClientConfigs[configIndex].ToolPricing = updatedConfig.ToolPricing
+	c.MCPConfig.ClientConfigs[configIndex].IsPingAvailable = updatedConfig.IsPingAvailable
+	c.MCPConfig.ClientConfigs[configIndex].ToolSyncInterval = updatedConfig.ToolSyncInterval
+	c.MCPConfig.ClientConfigs[configIndex].AllowOnAllVirtualKeys = updatedConfig.AllowOnAllVirtualKeys
+	return nil
+}
+
+// RemoveMCPClient removes an MCP client from the configuration.
+// This method is called when an MCP client is removed via the HTTP API.
+//
+// The method:
+//   - Validates that the MCP client exists
+//   - Removes the MCP client from the configuration
+//   - Removes the MCP client from the Bifrost client
+func (c *Config) RemoveMCPClient(ctx context.Context, id string) error {
+	if c.client == nil {
+		return fmt.Errorf("bifrost client not set")
+	}
+	c.muMCP.Lock()
+	defer c.muMCP.Unlock()
+	if c.MCPConfig == nil {
+		return fmt.Errorf("no MCP config found")
+	}
+	// Check if client is registered in Bifrost (can be not registered if client initialization failed)
+	if clients, err := c.client.GetMCPClients(); err == nil && len(clients) > 0 {
+		for _, client := range clients {
+			if client.Config.ID == id {
+				if err := c.client.RemoveMCPClient(id); err != nil {
+					return fmt.Errorf("failed to remove MCP client: %w", err)
+				}
+				break
+			}
+		}
+	}
+	// Find and remove client from in-memory config
+	for i, clientConfig := range c.MCPConfig.ClientConfigs {
+		if clientConfig.ID == id {
+			c.MCPConfig.ClientConfigs = append(c.MCPConfig.ClientConfigs[:i], c.MCPConfig.ClientConfigs[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+// RedactMCPClientConfig creates a redacted copy of a MCPClientConfig configuration.
+// Connection strings and headers are redacted for safe external exposure.
+func (c *Config) RedactMCPClientConfig(config *schemas.MCPClientConfig) *schemas.MCPClientConfig {
+	// Create an actual copy of the struct (not just a pointer copy)
+	// This prevents modifying the original config when redacting
+	configCopy := *config
+
+	// Redact connection string if present
+	if config.ConnectionString != nil {
+		configCopy.ConnectionString = config.ConnectionString.Redacted()
+	}
+
+	// Redact Header values if present
+	if config.Headers != nil {
+		configCopy.Headers = make(map[string]schemas.EnvVar, len(config.Headers))
+		for header, value := range config.Headers {
+			configCopy.Headers[header] = *value.Redacted()
+		}
+	}
+
+	return &configCopy
+}
+
+// autoDetectProviders automatically detects common environment variables and sets up providers
+// when no configuration file exists. This enables zero-config startup when users have set
+// standard environment variables like OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
+//
+// Supported environment variables:
+//   - OpenAI: OPENAI_API_KEY, OPENAI_KEY
+//   - Anthropic: ANTHROPIC_API_KEY, ANTHROPIC_KEY
+//   - Mistral: MISTRAL_API_KEY, MISTRAL_KEY
+//
+// For each detected provider, it creates a default configuration with:
+//   - The detected API key with weight 1.0
+//   - Empty models list (provider will use default models)
+//   - Default concurrency and buffer size settings
+func (c *Config) autoDetectProviders(ctx context.Context) {
+	// Define common environment variable patterns for each provider
+	providerEnvVars := map[schemas.ModelProvider][]string{
+		schemas.OpenAI:    {"OPENAI_API_KEY", "OPENAI_KEY"},
+		schemas.Anthropic: {"ANTHROPIC_API_KEY", "ANTHROPIC_KEY"},
+		schemas.Mistral:   {"MISTRAL_API_KEY", "MISTRAL_KEY"},
+	}
+
+	detectedCount := 0
+
+	for provider, envVars := range providerEnvVars {
+		for _, envVar := range envVars {
+			if apiKey := os.Getenv(envVar); apiKey != "" {
+				// Generate a unique ID for the auto-detected key
+				keyID := uuid.NewString()
+				// Create default provider configuration
+				providerConfig := configstore.ProviderConfig{
+					Keys: []schemas.Key{
+						{
+							ID:     keyID,
+							Name:   fmt.Sprintf("%s_auto_detected", envVar),
+							Value:  *schemas.NewEnvVar(apiKey),
+							Models: schemas.WhiteList{"*"},
+							Weight: 1.0,
+						},
+					},
+					ConcurrencyAndBufferSize: &schemas.DefaultConcurrencyAndBufferSize,
+				}
+				// Add to providers map
+				c.Providers[provider] = providerConfig
+				logger.Info("auto-detected %s provider from environment variable %s", provider, envVar)
+				detectedCount++
+				break // Only use the first found env var for each provider
+			}
+		}
+	}
+	if detectedCount > 0 {
+		logger.Info("auto-configured %d provider(s) from environment variables", detectedCount)
+		if c.ConfigStore != nil {
+			if err := c.ConfigStore.UpdateProvidersConfig(ctx, c.Providers); err != nil {
+				logger.Error("failed to update providers in store: %v", err)
+			}
+		}
+	}
+}
+
+// GetVectorStoreConfigRedacted retrieves the vector store configuration with password redacted for safe external exposure
+func (c *Config) GetVectorStoreConfigRedacted(ctx context.Context) (*vectorstore.Config, error) {
+	var err error
+	var vectorStoreConfig *vectorstore.Config
+	if c.ConfigStore != nil {
+		vectorStoreConfig, err = c.ConfigStore.GetVectorStoreConfig(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get vector store config: %w", err)
+		}
+	}
+	if vectorStoreConfig == nil {
+		return nil, nil
+	}
+	if vectorStoreConfig.Type == vectorstore.VectorStoreTypeWeaviate {
+		weaviateConfig, ok := vectorStoreConfig.Config.(*vectorstore.WeaviateConfig)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast vector store config to weaviate config")
+		}
+		// Create a copy to avoid modifying the original
+		redactedWeaviateConfig := *weaviateConfig
+		// Redact password if it exists
+		if redactedWeaviateConfig.APIKey != nil {
+			redactedWeaviateConfig.APIKey = redactedWeaviateConfig.APIKey.Redacted()
+		}
+		redactedVectorStoreConfig := *vectorStoreConfig
+		redactedVectorStoreConfig.Config = &redactedWeaviateConfig
+		return &redactedVectorStoreConfig, nil
+	}
+	return nil, nil
+}
+
+// ValidateCustomProvider validates the custom provider configuration
+func ValidateCustomProvider(config configstore.ProviderConfig, provider schemas.ModelProvider) error {
+	if config.CustomProviderConfig == nil {
+		return nil
+	}
+
+	cpc := config.CustomProviderConfig
+
+	// For standard providers: only allowed_requests is allowed
+	if bifrost.IsStandardProvider(provider) {
+		if cpc.BaseProviderType != "" {
+			return fmt.Errorf("custom provider validation failed: standard providers cannot set base_provider_type: %s", provider)
+		}
+		if cpc.IsKeyLess {
+			return fmt.Errorf("custom provider validation failed: standard providers cannot set is_key_less: %s", provider)
+		}
+		// allowed_requests is allowed — no further validation needed
+		return nil
+	}
+
+	// Validate base provider type
+	if cpc.BaseProviderType == "" {
+		return fmt.Errorf("custom provider validation failed: base_provider_type is required")
+	}
+
+	// Check if base provider is a supported base provider
+	if !bifrost.IsSupportedBaseProvider(cpc.BaseProviderType) {
+		return fmt.Errorf("custom provider validation failed: unsupported base_provider_type: %s", cpc.BaseProviderType)
+	}
+
+	// Reject Bedrock providers with IsKeyLess=true
+	if cpc.BaseProviderType == schemas.Bedrock && cpc.IsKeyLess {
+		return fmt.Errorf("custom provider validation failed: Bedrock providers cannot be keyless (is_key_less=true)")
+	}
+
+	return nil
+}
+
+// ValidateCustomProviderUpdate validates that immutable fields in CustomProviderConfig are not changed during updates
+func ValidateCustomProviderUpdate(newConfig, existingConfig configstore.ProviderConfig, provider schemas.ModelProvider) error {
+	// If neither config has CustomProviderConfig, no validation needed
+	if newConfig.CustomProviderConfig == nil && existingConfig.CustomProviderConfig == nil {
+		return nil
+	}
+
+	// For standard providers: skip all validation — allowed_requests is the only field we preserve
+	if bifrost.IsStandardProvider(provider) {
+		return nil
+	}
+
+	// If new config doesn't have CustomProviderConfig but existing does, return an error
+	if newConfig.CustomProviderConfig == nil {
+		return fmt.Errorf("custom_provider_config cannot be removed after creation for provider %s", provider)
+	}
+
+	// If existing config doesn't have CustomProviderConfig but new one does, that's fine (adding it)
+	if existingConfig.CustomProviderConfig == nil {
+		return ValidateCustomProvider(newConfig, provider)
+	}
+
+	// Both configs have CustomProviderConfig, validate immutable fields
+	newCPC := newConfig.CustomProviderConfig
+	existingCPC := existingConfig.CustomProviderConfig
+
+	// CustomProviderKey is internally set and immutable, no validation needed
+
+	// Check if BaseProviderType is being changed
+	if newCPC.BaseProviderType != existingCPC.BaseProviderType {
+		return fmt.Errorf("provider %s: base_provider_type cannot be changed from %s to %s after creation",
+			provider, existingCPC.BaseProviderType, newCPC.BaseProviderType)
+	}
+
+	// Validate the new config (this will catch Bedrock+IsKeyLess configurations)
+	if err := ValidateCustomProvider(newConfig, provider); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Config) AddProviderKeysToSemanticCacheConfig(config *schemas.PluginConfig) error {
+	if config.Name != semanticcache.PluginName {
+		return nil
+	}
+
+	// Check if config.Config exists
+	if config.Config == nil {
+		return fmt.Errorf("semantic_cache plugin config is nil")
+	}
+
+	// Type assert config.Config to map[string]interface{}
+	configMap, ok := config.Config.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("semantic_cache plugin config must be a map, got %T", config.Config)
+	}
+
+	dimension, hasDimension, err := semanticCacheConfigDimension(configMap)
+	if err != nil {
+		return err
+	}
+
+	// Check if provider key exists and is a string
+	providerVal, exists := configMap["provider"]
+	if !exists {
+		if hasDimension && dimension == 1 {
+			delete(configMap, "keys")
+			delete(configMap, "embedding_model")
+			return nil
+		}
+		return fmt.Errorf("semantic_cache plugin requires 'provider' for semantic mode (dimension > 1). For direct-only mode, set dimension: 1 and omit provider")
+	}
+
+	provider, ok := providerVal.(string)
+	if !ok {
+		return fmt.Errorf("semantic_cache plugin 'provider' field must be a string, got %T", providerVal)
+	}
+	provider = strings.TrimSpace(provider)
+	configMap["provider"] = provider
+
+	if provider == "" {
+		if hasDimension && dimension == 1 {
+			delete(configMap, "provider")
+			delete(configMap, "keys")
+			delete(configMap, "embedding_model")
+			return nil
+		}
+		return fmt.Errorf("semantic_cache plugin requires a non-empty 'provider' for semantic mode (dimension > 1). For direct-only mode, set dimension: 1 and omit provider")
+	}
+	if !hasDimension {
+		return fmt.Errorf("semantic_cache plugin requires 'dimension' for provider-backed semantic mode. For direct-only mode, set dimension: 1 and omit provider")
+	}
+	if dimension <= 1 {
+		return fmt.Errorf("semantic_cache plugin requires 'dimension' > 1 when 'provider' is set. Use dimension: 1 only for direct-only mode without a provider")
+	}
+
+	embeddingModelVal, exists := configMap["embedding_model"]
+	if !exists {
+		return fmt.Errorf("semantic_cache plugin requires 'embedding_model' when 'provider' is set")
+	}
+	embeddingModel, ok := embeddingModelVal.(string)
+	if !ok {
+		return fmt.Errorf("semantic_cache plugin 'embedding_model' field must be a string, got %T", embeddingModelVal)
+	}
+	embeddingModel = strings.TrimSpace(embeddingModel)
+	if embeddingModel == "" {
+		return fmt.Errorf("semantic_cache plugin requires a non-empty 'embedding_model' when 'provider' is set")
+	}
+	configMap["embedding_model"] = embeddingModel
+
+	keys, err := c.GetProviderConfigRaw(schemas.ModelProvider(provider))
+	if err != nil {
+		return fmt.Errorf("failed to get provider config for %s: %w", provider, err)
+	}
+
+	configMap["keys"] = keys.Keys
+
+	return nil
+}
+
+func semanticCacheConfigDimension(configMap map[string]interface{}) (int, bool, error) {
+	dimensionVal, exists := configMap["dimension"]
+	if !exists {
+		return 0, false, nil
+	}
+
+	switch v := dimensionVal.(type) {
+	case int:
+		if v < 1 {
+			return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' must be >= 1, got %d", v)
+		}
+		return v, true, nil
+	case int32:
+		if v < 1 {
+			return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' must be >= 1, got %d", v)
+		}
+		return int(v), true, nil
+	case int64:
+		if v < 1 {
+			return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' must be >= 1, got %d", v)
+		}
+		return int(v), true, nil
+	case float64:
+		if v != math.Trunc(v) {
+			return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' field must be an integer, got %v", v)
+		}
+		if v < 1 {
+			return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' must be >= 1, got %v", v)
+		}
+		return int(v), true, nil
+	case json.Number:
+		parsed, err := v.Int64()
+		if err != nil {
+			return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' field must be an integer, got %q", v)
+		}
+		if parsed < 1 {
+			return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' must be >= 1, got %d", parsed)
+		}
+		return int(parsed), true, nil
+	default:
+		return 0, false, fmt.Errorf("semantic_cache plugin 'dimension' field must be numeric, got %T", dimensionVal)
+	}
+}
+
+func (c *Config) RemoveProviderKeysFromSemanticCacheConfig(config *configstoreTables.TablePlugin) error {
+	if config.Name != semanticcache.PluginName {
+		return nil
+	}
+
+	// Check if config.Config exists
+	if config.Config == nil {
+		return fmt.Errorf("semantic_cache plugin config is nil")
+	}
+
+	// Type assert config.Config to map[string]interface{}
+	configMap, ok := config.Config.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("semantic_cache plugin config must be a map, got %T", config.Config)
+	}
+
+	configMap["keys"] = []schemas.Key{}
+
+	config.Config = configMap
+
+	return nil
+}
+
+func (c *Config) GetAvailableProviders() []schemas.ModelProvider {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+	availableProviders := []schemas.ModelProvider{}
+	for provider, config := range c.Providers {
+		// Check if the provider has at least one key with a non-empty value. If so, add the provider to the list.
+		// If the provider allows empty keys, add the provider to the list.
+		for _, key := range config.Keys {
+			if key.Value.GetValue() != "" || bifrost.CanProviderKeyValueBeEmpty(provider) {
+				if key.Enabled != nil && !*key.Enabled {
+					continue
+				}
+				availableProviders = append(availableProviders, provider)
+				break
+			}
+		}
+	}
+	return availableProviders
+}
+
+func DeepCopy[T any](in T) (T, error) {
+	var out T
+	b, err := sonic.Marshal(in)
+	if err != nil {
+		return out, err
+	}
+	err = sonic.Unmarshal(b, &out)
+	return out, err
+}
+
+func applyProviderPricingOverrides(catalog *modelcatalog.ModelCatalog, providers map[schemas.ModelProvider]configstore.ProviderConfig) {
+	if catalog == nil {
+		return
+	}
+	for provider, providerConfig := range providers {
+		if err := catalog.SetProviderPricingOverrides(provider, providerConfig.PricingOverrides); err != nil {
+			logger.Warn("failed to load pricing overrides for provider %s: %v", provider, err)
+		}
+	}
+}
+
+// WriteConfigToFile dumps the current in-memory configuration to config.json.
+// This enables two-way sync: config.json → DB on startup, DB → config.json on every mutation.
+// Written atomically (temp file + rename) to prevent corruption.
+// IMPORTANT: Existing providers in config.json that are NOT in memory are preserved (merge, not replace).
+func (c *Config) WriteConfigToFile() error {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	configPath := c.configPath
+	if configPath == "" {
+		return fmt.Errorf("config file path not set")
+	}
+
+	// Load existing config.json to preserve fields we don't manage
+	var existing map[string]any
+	existingData, err := os.ReadFile(configPath)
+	if err == nil && len(existingData) > 0 {
+		_ = json.Unmarshal(existingData, &existing)
+	}
+
+	// Marshal the parts we manage
+	cd := c.buildConfigDataForFile()
+	newBytes, err := json.MarshalIndent(cd, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	var newMap map[string]any
+	_ = json.Unmarshal(newBytes, &newMap)
+
+	// Merge: new values override existing, extra fields preserved
+	merged := existing
+	if merged == nil {
+		merged = make(map[string]any)
+	}
+	for k, v := range newMap {
+		merged[k] = v
+	}
+
+	// CRITICAL: Preserve existing providers from config.json that aren't in memory.
+	// This prevents data loss when a provider fails to load (e.g., missing env vars).
+	if existingProviders, ok := existing["providers"].(map[string]any); ok {
+		if newProviders, ok := merged["providers"].(map[string]any); ok {
+			for name, cfg := range existingProviders {
+				if _, exists := newProviders[name]; !exists {
+					newProviders[name] = cfg // Preserve missing provider
+				}
+			}
+		}
+	}
+
+	// Marshal final config
+	bytes, err := json.MarshalIndent(merged, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal merged config: %w", err)
+	}
+	bytes = append(bytes, '\n')
+
+	// Atomic write: write to temp file, then rename
+	dir := filepath.Dir(configPath)
+	tmpFile, err := os.CreateTemp(dir, "config-*.json.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp config file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	if _, err := tmpFile.Write(bytes); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to write temp config: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp config: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to rename temp config: %w", err)
+	}
+
+	logger.Info("config written to %s", configPath)
+	return nil
+}
+
+// buildConfigDataForFile constructs a ConfigData from the current in-memory state.
+func (c *Config) buildConfigDataForFile() *ConfigData {
+	c.Mu.RLock()
+	defer c.Mu.RUnlock()
+
+	cd := &ConfigData{
+		Providers: make(map[string]configstore.ProviderConfig),
+	}
+
+	// Client config
+	if c.ClientConfig != nil {
+		cd.Client = c.ClientConfig
+	}
+
+	// Providers — include ALL providers from in-memory
+	for provider, cfg := range c.Providers {
+		cd.Providers[string(provider)] = cfg
+	}
+
+	// Governance config (VKs, budgets, rate limits, teams, customers)
+	if c.GovernanceConfig != nil {
+		cd.Governance = &configstore.GovernanceConfig{
+			VirtualKeys:  c.GovernanceConfig.VirtualKeys,
+			Budgets:      c.GovernanceConfig.Budgets,
+			RateLimits:   c.GovernanceConfig.RateLimits,
+			Teams:        c.GovernanceConfig.Teams,
+			Customers:    c.GovernanceConfig.Customers,
+			RoutingRules: c.GovernanceConfig.RoutingRules,
+		}
+	}
+
+	// MCP config
+	c.muMCP.RLock()
+	cd.MCP = c.MCPConfig
+	c.muMCP.RUnlock()
+
+	// Plugins
+	c.pluginsMu.Lock()
+	plugins := c.PluginConfigs
+	c.pluginsMu.Unlock()
+	cd.Plugins = plugins
+
+	return cd
+}
+
+// deepMergeConfig merges newConfig into existingConfig, preserving extra fields from existing.
+// newConfig values take precedence for overlapping keys.
+func deepMergeConfig(existing, newConfig map[string]any) *ConfigData {
+	// Apply new values over existing
+	for k, v := range newConfig {
+		existing[k] = v
+	}
+
+	// Re-serialize as JSON and parse back through ConfigData to ensure type safety
+	bytes, _ := json.Marshal(existing)
+	var cd ConfigData
+	if err := json.Unmarshal(bytes, &cd); err != nil {
+		logger.Warn("failed to re-parse merged config: %v, using new config only", err)
+		return nil
+	}
+	return &cd
 }
 
 // SortAndRebuildPlugins sorts BasePlugins by placement group then order, and rebuilds caches.

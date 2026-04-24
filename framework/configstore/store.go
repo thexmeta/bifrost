@@ -135,6 +135,10 @@ type ConfigStore interface {
 	GetConfig(ctx context.Context, key string) (*tables.TableGovernanceConfig, error)
 	UpdateConfig(ctx context.Context, config *tables.TableGovernanceConfig, tx ...*gorm.DB) error
 
+	// Enterprise config CRUD (stored as JSON in governance_config table)
+	GetEnterpriseConfig(ctx context.Context) (map[string]any, error)
+	UpdateEnterpriseConfig(ctx context.Context, config map[string]any) error
+
 	// Plugins CRUD
 	GetPlugins(ctx context.Context) ([]*tables.TablePlugin, error)
 	GetPlugin(ctx context.Context, name string) (*tables.TablePlugin, error)
@@ -244,6 +248,25 @@ type ConfigStore interface {
 	CreateSession(ctx context.Context, session *tables.SessionsTable) error
 	DeleteSession(ctx context.Context, token string) error
 	FlushSessions(ctx context.Context) error
+
+	// RBAC - Roles
+	GetRoles(ctx context.Context) ([]tables.TableRole, error)
+	GetRole(ctx context.Context, id string) (*tables.TableRole, error)
+	CreateRole(ctx context.Context, role *tables.TableRole, tx ...*gorm.DB) error
+	UpdateRole(ctx context.Context, role *tables.TableRole, tx ...*gorm.DB) error
+	DeleteRole(ctx context.Context, id string, tx ...*gorm.DB) error
+	GetDefaultRole(ctx context.Context) (*tables.TableRole, error)
+
+	// RBAC - Role Permissions
+	GetRolePermissions(ctx context.Context, roleID string) ([]tables.TableRolePermission, error)
+	UpsertRolePermission(ctx context.Context, perm *tables.TableRolePermission, tx ...*gorm.DB) error
+	DeleteRolePermission(ctx context.Context, roleID string, resource string, operation string, tx ...*gorm.DB) error
+
+	// RBAC - User Roles
+	GetUserRoles(ctx context.Context, userID string) ([]tables.TableRole, error)
+	AssignUserRole(ctx context.Context, userID string, roleID string, tx ...*gorm.DB) error
+	RemoveUserRole(ctx context.Context, userID string, roleID string, tx ...*gorm.DB) error
+	CheckUserPermission(ctx context.Context, userID string, resource string, operation string) (bool, error)
 
 	// Model pricing CRUD
 	GetModelPrices(ctx context.Context) ([]tables.TableModelPricing, error)

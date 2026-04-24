@@ -91,7 +91,11 @@ func (p *TableProvider) BeforeSave(tx *gorm.DB) error {
 		p.ProxyConfigJSON = string(data)
 	}
 	if p.CustomProviderConfig != nil && p.CustomProviderConfig.BaseProviderType == "" {
-		return fmt.Errorf("base_provider_type is required when custom_provider_config is set")
+		// For standard providers, allowed_requests alone is valid — base_provider_type
+		// is only required for custom providers
+		if !bifrost.IsStandardProvider(schemas.ModelProvider(p.Name)) {
+			return fmt.Errorf("base_provider_type is required when custom_provider_config is set")
+		}
 	}
 	if p.CustomProviderConfig != nil {
 		data, err := json.Marshal(p.CustomProviderConfig)

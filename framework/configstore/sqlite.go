@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -53,6 +54,14 @@ func newSqliteConfigStore(ctx context.Context, config *SQLiteConfig, logger sche
 	// Run migrations
 	if err := triggerMigrations(ctx, db); err != nil {
 		return nil, err
+	}
+	// Create RBAC tables if they don't exist
+	if err := db.AutoMigrate(&tables.TableRole{}, &tables.TableRolePermission{}, &tables.TableUserRole{}); err != nil {
+		return nil, fmt.Errorf("failed to create RBAC tables: %w", err)
+	}
+	// Seed default RBAC roles
+	if err := migrationSeedRBACRoles(ctx, db); err != nil {
+		return nil, fmt.Errorf("failed to seed RBAC roles: %w", err)
 	}
 	// Encrypt any plaintext rows if encryption is enabled
 	if err := s.EncryptPlaintextRows(ctx); err != nil {

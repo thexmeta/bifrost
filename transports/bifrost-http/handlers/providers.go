@@ -293,6 +293,14 @@ func (h *ProviderHandler) addProvider(ctx *fasthttp.RequestCtx) {
 		CustomProviderConfig:     payload.CustomProviderConfig,
 		OpenAIConfig:             payload.OpenAIConfig,
 	}
+	// For standard providers, only preserve allowed_requests — strip base_provider_type/is_key_less
+	if bifrost.IsStandardProvider(payload.Provider) {
+		if payload.CustomProviderConfig != nil {
+			config.CustomProviderConfig = &schemas.CustomProviderConfig{
+				AllowedRequests: payload.CustomProviderConfig.AllowedRequests,
+			}
+		}
+	}
 	// Validate custom provider configuration before persisting
 	if err := lib.ValidateCustomProvider(config, payload.Provider); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid custom provider config: %v", err))
@@ -344,6 +352,11 @@ func (h *ProviderHandler) addProvider(ctx *fasthttp.RequestCtx) {
 	response := h.getProviderResponseFromConfig(payload.Provider, *redactedConfig, ProviderStatusActive)
 
 	SendJSON(ctx, response)
+
+	// Persist to config.json for two-way sync
+	if err := h.inMemoryStore.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after provider add: %v", err)
+	}
 }
 
 // updateProvider handles PUT /api/providers/{provider} - Update provider config
@@ -396,6 +409,56 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 		Description:              oldConfigRaw.Description,
 	}
 
+	// For standard providers: strip base_provider_type/is_key_less from both existing and incoming
+	// This prevents "custom provider validation failed" errors on update
+	if bifrost.IsStandardProvider(provider) {
+		if config.CustomProviderConfig != nil {
+			config.CustomProviderConfig = &schemas.CustomProviderConfig{
+				AllowedRequests: config.CustomProviderConfig.AllowedRequests,
+			}
+		}
+		// If payload provides allowed_requests, use them
+		if payload.CustomProviderConfig != nil {
+			if config.CustomProviderConfig == nil {
+				config.CustomProviderConfig = &schemas.CustomProviderConfig{}
+			}
+			config.CustomProviderConfig.AllowedRequests = payload.CustomProviderConfig.AllowedRequests
+		}
+	}
+
+	// Environment variable cleanup is now handled automatically by mergeKeys function
+
+	var keysToAdd []schemas.Key
+	var keysToUpdate []schemas.Key
+
+	for _, key := range payload.Keys {
+		if !slices.ContainsFunc(oldConfigRaw.Keys, func(k schemas.Key) bool {
+			return k.ID == key.ID
+		}) {
+			// By default new keys are enabled
+			key.Enabled = bifrost.Ptr(true)
+			keysToAdd = append(keysToAdd, key)
+		} else {
+			keysToUpdate = append(keysToUpdate, key)
+		}
+	}
+
+	var keysToDelete []schemas.Key
+	for _, key := range oldConfigRaw.Keys {
+		if !slices.ContainsFunc(payload.Keys, func(k schemas.Key) bool {
+			return k.ID == key.ID
+		}) {
+			keysToDelete = append(keysToDelete, key)
+		}
+	}
+
+	keys, err := h.mergeKeys(oldConfigRaw.Keys, oldConfigRedacted.Keys, keysToAdd, keysToDelete, keysToUpdate)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid keys: %v", err))
+		return
+	}
+	config.Keys = keys
+
 	if payload.ConcurrencyAndBufferSize.Concurrency == 0 {
 		SendError(ctx, fasthttp.StatusBadRequest, "Concurrency must be greater than 0")
 		return
@@ -412,7 +475,19 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 
 	// Build a prospective config with the requested CustomProviderConfig (including nil)
 	prospective := config
-	prospective.CustomProviderConfig = payload.CustomProviderConfig
+	if bifrost.IsStandardProvider(provider) {
+		// For standard providers, strip base_provider_type/is_key_less from both existing and new
+		existingCPC := &schemas.CustomProviderConfig{}
+		if oldCPC := oldConfigRaw.CustomProviderConfig; oldCPC != nil {
+			existingCPC.AllowedRequests = oldCPC.AllowedRequests
+		}
+		if payload.CustomProviderConfig != nil {
+			existingCPC.AllowedRequests = payload.CustomProviderConfig.AllowedRequests
+		}
+		prospective.CustomProviderConfig = existingCPC
+	} else {
+		prospective.CustomProviderConfig = payload.CustomProviderConfig
+	}
 	if err := lib.ValidateCustomProviderUpdate(prospective, *oldConfigRaw, provider); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid custom provider config: %v", err))
 		return
@@ -443,7 +518,16 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 	}
 
 	config.ProxyConfig = payload.ProxyConfig
-	config.CustomProviderConfig = payload.CustomProviderConfig
+	// For standard providers, only allow custom_provider_config.allowed_requests (not base_provider_type or is_key_less)
+	if bifrost.IsStandardProvider(provider) {
+		if payload.CustomProviderConfig != nil {
+			config.CustomProviderConfig = &schemas.CustomProviderConfig{
+				AllowedRequests: payload.CustomProviderConfig.AllowedRequests,
+			}
+		}
+	} else {
+		config.CustomProviderConfig = payload.CustomProviderConfig
+	}
 	config.OpenAIConfig = payload.OpenAIConfig
 	if payload.SendBackRawRequest != nil {
 		config.SendBackRawRequest = *payload.SendBackRawRequest
@@ -510,6 +594,11 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 	response := h.getProviderResponseFromConfig(provider, *redactedConfig, ProviderStatusActive)
 
 	SendJSON(ctx, response)
+
+	// Persist to config.json for two-way sync
+	if err := h.inMemoryStore.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after provider update: %v", err)
+	}
 }
 
 // deleteProvider handles DELETE /api/providers/{provider} - Remove provider
@@ -535,6 +624,11 @@ func (h *ProviderHandler) deleteProvider(ctx *fasthttp.RequestCtx) {
 	}
 
 	SendJSON(ctx, response)
+
+	// Persist to config.json for two-way sync
+	if err := h.inMemoryStore.WriteConfigToFile(); err != nil {
+		logger.Warn("failed to write config to file after provider delete: %v", err)
+	}
 }
 
 // listKeys handles GET /api/keys - List all keys

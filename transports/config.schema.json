@@ -302,6 +302,9 @@
         },
         "runway": {
           "$ref": "#/$defs/provider"
+        },
+        "nvidia-nim": {
+          "$ref": "#/$defs/provider"
         }
       },
       "additionalProperties": true
@@ -835,7 +838,14 @@
                     "default": 50
                   }
                 },
-                "required": ["host", "port", "user", "password", "db_name", "ssl_mode"],
+                "required": [
+                  "host",
+                  "port",
+                  "user",
+                  "password",
+                  "db_name",
+                  "ssl_mode"
+                ],
                 "additionalProperties": false
               }
             }
@@ -926,7 +936,14 @@
                     "default": 50
                   }
                 },
-                "required": ["host", "port", "user", "password", "db_name", "ssl_mode"],
+                "required": [
+                  "host",
+                  "port",
+                  "user",
+                  "password",
+                  "db_name",
+                  "ssl_mode"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1038,6 +1055,7 @@
       },
       "additionalProperties": false
     },
+
     "plugins": {
       "type": "array",
       "description": "Plugins configuration",
@@ -1296,7 +1314,8 @@
                         "perplexity",
                         "replicate",
                         "sgl",
-                        "huggingface"
+                        "huggingface",
+                        "nvidia-nim"
                       ]
                     },
                     "keys": {
@@ -1568,6 +1587,12 @@
     },
     "access_profiles": {
       "$ref": "#/$defs/access_profiles"
+    },
+    "saml_config": {
+      "$ref": "#/$defs/saml_config"
+    },
+    "enterprise": {
+      "$ref": "#/$defs/enterprise_config"
     }
   },
   "additionalProperties": false,
@@ -3029,7 +3054,11 @@
                   "description": "Number of failed probes before marking as failed"
                 }
               },
-              "required": ["timeout_seconds", "success_threshold", "failure_threshold"],
+              "required": [
+                "timeout_seconds",
+                "success_threshold",
+                "failure_threshold"
+              ],
               "additionalProperties": false
             }
           },
@@ -3417,11 +3446,7 @@
           "description": "Reset window, e.g. \"1M\", \"1h\""
         }
       },
-      "required": [
-        "id",
-        "max_limit",
-        "reset_duration"
-      ],
+      "required": ["id", "max_limit", "reset_duration"],
       "additionalProperties": false
     },
     "rate_limit_line": {
@@ -3513,9 +3538,7 @@
           }
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false
     },
     "access_profile_provider_config": {
@@ -3547,9 +3570,7 @@
           "$ref": "#/$defs/rate_limit_line"
         }
       },
-      "required": [
-        "provider_name"
-      ],
+      "required": ["provider_name"],
       "additionalProperties": false
     },
     "access_profile_mcp_tool_group": {
@@ -3561,9 +3582,7 @@
           "description": "MCP tool group ID"
         }
       },
-      "required": [
-        "tool_group_id"
-      ],
+      "required": ["tool_group_id"],
       "additionalProperties": false
     },
     "access_profile_mcp_server": {
@@ -3574,9 +3593,7 @@
           "description": "MCP server identifier"
         }
       },
-      "required": [
-        "mcp_server_id"
-      ],
+      "required": ["mcp_server_id"],
       "additionalProperties": false
     },
     "access_profile_mcp_tool_override": {
@@ -3596,11 +3613,7 @@
           "description": "Override action"
         }
       },
-      "required": [
-        "mcp_client_id",
-        "tool_name",
-        "action"
-      ],
+      "required": ["mcp_client_id", "tool_name", "action"],
       "additionalProperties": false
     },
     "audit_logs_config": {
@@ -3778,7 +3791,14 @@
           "description": "Internal hash for change detection (auto-managed)"
         }
       },
-      "required": ["id", "name", "scope_kind", "match_type", "pattern", "request_types"],
+      "required": [
+        "id",
+        "name",
+        "scope_kind",
+        "match_type",
+        "pattern",
+        "request_types"
+      ],
       "additionalProperties": false
     },
     "pricing_override_match_type": {
@@ -4006,6 +4026,414 @@
       },
       "required": ["base_provider_type"],
       "additionalProperties": false
+    },
+    "enterprise_config": {
+      "type": "object",
+      "description": "Enterprise features configuration (requires enterprise license)",
+      "properties": {
+        "rbac": {
+          "type": "object",
+          "description": "Role-Based Access Control configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable RBAC",
+              "default": false
+            },
+            "default_role": {
+              "type": "string",
+              "description": "Default role for new users",
+              "default": "viewer"
+            }
+          },
+          "additionalProperties": false
+        },
+        "sso": {
+          "type": "object",
+          "description": "Single Sign-On configuration (Okta, Entra ID)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable SSO",
+              "default": false
+            },
+            "provider": {
+              "type": "string",
+              "enum": ["okta", "entra"],
+              "description": "SSO provider type"
+            },
+            "issuer": {
+              "type": "string",
+              "format": "uri",
+              "description": "OIDC issuer URL"
+            },
+            "client_id": {
+              "type": "string",
+              "description": "OAuth client ID (can use env. prefix)"
+            },
+            "client_secret": {
+              "type": "string",
+              "description": "OAuth client secret (can use env. prefix)"
+            },
+            "redirect_uri": {
+              "type": "string",
+              "format": "uri",
+              "description": "OAuth redirect URI"
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "OAuth scopes"
+            },
+            "user_id_claim": {
+              "type": "string",
+              "description": "JWT claim for user ID",
+              "default": "sub"
+            },
+            "email_claim": {
+              "type": "string",
+              "description": "JWT claim for email",
+              "default": "email"
+            },
+            "name_claim": {
+              "type": "string",
+              "description": "JWT claim for name",
+              "default": "name"
+            },
+            "groups_claim": {
+              "type": "string",
+              "description": "JWT claim for groups",
+              "default": "groups"
+            },
+            "role_mappings": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Map IdP groups to Bifrost roles"
+            }
+          },
+          "additionalProperties": false
+        },
+        "audit_logs": {
+          "type": "object",
+          "description": "Audit logs configuration for compliance",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable audit logging",
+              "default": false
+            },
+            "retention_days": {
+              "type": "integer",
+              "description": "Number of days to retain audit logs",
+              "default": 365,
+              "minimum": 1
+            },
+            "include_request_body": {
+              "type": "boolean",
+              "description": "Include request body in audit logs",
+              "default": false
+            },
+            "include_response_body": {
+              "type": "boolean",
+              "description": "Include response body in audit logs",
+              "default": false
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of events to audit"
+            }
+          },
+          "additionalProperties": false
+        },
+        "guardrails": {
+          "type": "object",
+          "description": "Guardrails configuration for content safety",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable guardrails",
+              "default": false
+            },
+            "providers": {
+              "type": "object",
+              "description": "Guardrail provider configurations",
+              "properties": {
+                "aws_bedrock": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "region": {
+                      "type": "string",
+                      "default": "us-east-1"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "azure_content_safety": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "endpoint": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "patronus": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "api_key": {
+                      "type": "string",
+                      "description": "Patronus API key (can use env. prefix)"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "description": "Custom guardrail rules"
+            }
+          },
+          "additionalProperties": false
+        },
+        "vault": {
+          "type": "object",
+          "description": "Vault integration for secret management",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable vault integration",
+              "default": false
+            },
+            "type": {
+              "type": "string",
+              "enum": ["hashicorp", "aws", "google", "azure"],
+              "description": "Vault provider type"
+            },
+            "config": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "description": "Vault address (can use env. prefix)"
+                },
+                "token": {
+                  "type": "string",
+                  "description": "Vault token (can use env. prefix)"
+                },
+                "sync_paths": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Vault paths to sync"
+                },
+                "sync_interval_seconds": {
+                  "type": "integer",
+                  "description": "Sync interval in seconds",
+                  "default": 300,
+                  "minimum": 60
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "clustering": {
+          "type": "object",
+          "description": "Clustering configuration for high availability",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable clustering",
+              "default": false
+            },
+            "node_name": {
+              "type": "string",
+              "description": "Unique node name"
+            },
+            "advertise_addr": {
+              "type": "string",
+              "description": "Address to advertise to other nodes"
+            },
+            "bind_addr": {
+              "type": "string",
+              "description": "Address to bind to",
+              "default": "0.0.0.0"
+            },
+            "bind_port": {
+              "type": "integer",
+              "description": "Port to bind to",
+              "default": 8301,
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "retry_join": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of nodes to join"
+            }
+          },
+          "additionalProperties": false
+        },
+        "adaptive_load_balancing": {
+          "type": "object",
+          "description": "Adaptive load balancing configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable adaptive load balancing",
+              "default": false
+            },
+            "health_check_interval_seconds": {
+              "type": "integer",
+              "description": "Health check interval in seconds",
+              "default": 10,
+              "minimum": 1
+            },
+            "warmup_requests": {
+              "type": "integer",
+              "description": "Number of warmup requests",
+              "default": 10,
+              "minimum": 0
+            },
+            "ewma_alpha": {
+              "type": "number",
+              "description": "EWMA smoothing factor",
+              "default": 0.3,
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "log_exports": {
+          "type": "object",
+          "description": "Log exports configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable log exports",
+              "default": false
+            },
+            "destination": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["s3", "gcs", "azure_blob"],
+                  "description": "Export destination type"
+                },
+                "config": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {
+                      "type": "string",
+                      "description": "Bucket/container name"
+                    },
+                    "region": {
+                      "type": "string",
+                      "description": "Cloud region"
+                    },
+                    "prefix": {
+                      "type": "string",
+                      "description": "Path prefix for exported logs"
+                    },
+                    "format": {
+                      "type": "string",
+                      "enum": ["json", "csv"],
+                      "description": "Export format"
+                    },
+                    "compression": {
+                      "type": "string",
+                      "enum": ["gzip", "none"],
+                      "description": "Compression type"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "schedule": {
+              "type": "object",
+              "properties": {
+                "interval_hours": {
+                  "type": "integer",
+                  "description": "Export interval in hours",
+                  "minimum": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "datadog": {
+          "type": "object",
+          "description": "Datadog integration configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Datadog integration",
+              "default": false
+            },
+            "api_key": {
+              "type": "string",
+              "description": "Datadog API key (can use env. prefix)"
+            },
+            "app_key": {
+              "type": "string",
+              "description": "Datadog App key (can use env. prefix)"
+            },
+            "site": {
+              "type": "string",
+              "description": "Datadog site",
+              "default": "datadoghq.com"
+            },
+            "traces_enabled": {
+              "type": "boolean",
+              "description": "Enable trace export",
+              "default": true
+            },
+            "metrics_enabled": {
+              "type": "boolean",
+              "description": "Enable metrics export",
+              "default": true
+            },
+            "logs_enabled": {
+              "type": "boolean",
+              "description": "Enable logs export",
+              "default": false
+            }
+          }
+        }
+      }
     }
   }
 }

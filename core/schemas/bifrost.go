@@ -58,6 +58,7 @@ const (
 	VLLM        ModelProvider = "vllm"
 	Runway      ModelProvider = "runway"
 	Fireworks   ModelProvider = "fireworks"
+	NvidiaNIM   ModelProvider = "nvidia-nim"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -69,6 +70,7 @@ var SupportedBaseProviders = []ModelProvider{
 	OpenAI,
 	HuggingFace,
 	Replicate,
+	NvidiaNIM,
 }
 
 // StandardProviders is the list of all built-in (non-custom) providers.
@@ -96,6 +98,7 @@ var StandardProviders = []ModelProvider{
 	VLLM,
 	Runway,
 	Fireworks,
+	NvidiaNIM,
 }
 
 // RequestType represents the type of request being made to a provider.
