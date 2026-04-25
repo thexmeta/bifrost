@@ -74,12 +74,17 @@ interface LEdge {
 
 export function buildTrie(rules: RoutingRule[]): TrieNode {
 	let uid = 0;
-	const mkNode = (c: string | null): TrieNode => ({
-		id: c === null ? "root" : `n${++uid}`,
-		condition: c,
-		children: new Map(),
-		terminals: [],
-	});
+	const nodeTerminalIds = new Map<string, Set<string>>();
+	const mkNode = (c: string | null): TrieNode => {
+		const id = c === null ? "root" : `n${++uid}`;
+		nodeTerminalIds.set(id, new Set());
+		return {
+			id,
+			condition: c,
+			children: new Map(),
+			terminals: [],
+		};
+	};
 	const root = mkNode(null);
 
 	// Pre-collect all (rule, normalized-path) pairs so we can compute frequencies.
@@ -110,7 +115,12 @@ export function buildTrie(rules: RoutingRule[]): TrieNode {
 			if (!node.children.has(cond)) node.children.set(cond, mkNode(cond));
 			node = node.children.get(cond)!;
 		}
-		if (!node.terminals.find((r) => r.id === rule.id)) node.terminals.push(rule);
+
+		const terminalsSet = nodeTerminalIds.get(node.id)!;
+		if (!terminalsSet.has(rule.id)) {
+			terminalsSet.add(rule.id);
+			node.terminals.push(rule);
+		}
 	}
 
 	return root;
