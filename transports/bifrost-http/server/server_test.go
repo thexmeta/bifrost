@@ -391,3 +391,15 @@ func TestMarshalPluginConfig_WithComplexType(t *testing.T) {
 		t.Errorf("Expected nested name=nested-config, got %s", result.Nested.Name)
 	}
 }
+
+func TestSetLogger(t *testing.T) {
+	prevLogger := logger
+	defer func() { logger = prevLogger }()
+
+	mockLogger := &noopTestLogger{}
+	SetLogger(mockLogger)
+
+	if logger != mockLogger {
+		t.Errorf("expected logger to be %v, got %v", mockLogger, logger)
+	}
+}
