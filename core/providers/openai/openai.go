@@ -591,17 +591,10 @@ func HandleOpenAITextCompletionStreaming(
 			jsonData := string(data)
 			var response schemas.BifrostTextCompletionResponse
 			if customResponseHandler != nil {
-				rawRequest, rawResponse, handlerErr := customResponseHandler([]byte(jsonData), &response, nil, sendBackRawRequest, sendBackRawResponse)
+				_, _, handlerErr := customResponseHandler([]byte(jsonData), &response, nil, sendBackRawRequest, sendBackRawResponse)
 				if handlerErr != nil {
-					// TODO fix this
-					if sendBackRawRequest {
-						handlerErr.ExtraFields.RawRequest = rawRequest
-					}
-					if sendBackRawResponse {
-						handlerErr.ExtraFields.RawResponse = rawResponse
-					}
 					ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
-					providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, handlerErr, jsonBody, nil, sendBackRawRequest, sendBackRawResponse), responseChan, logger, postHookSpanFinalizer)
+					providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, handlerErr, jsonBody, []byte(jsonData), sendBackRawRequest, sendBackRawResponse), responseChan, logger, postHookSpanFinalizer)
 					return
 				}
 			} else {
@@ -784,9 +777,9 @@ func HandleOpenAIChatCompletionRequest(
 					Error:   fmt.Errorf("missing API key for custom provider %s", providerName),
 				},
 				ExtraFields: schemas.BifrostErrorExtraFields{
-					Provider:       providerName,
-					ModelRequested: request.Model,
-					RequestType:    schemas.ChatCompletionRequest,
+					Provider:               providerName,
+					OriginalModelRequested: request.Model,
+					RequestType:            schemas.ChatCompletionRequest,
 				},
 			}
 		}
@@ -1169,18 +1162,11 @@ func HandleOpenAIChatCompletionStreaming(
 
 			// Parse into bifrost response
 			var response schemas.BifrostChatResponse
-			// TODO fix this
 			if customResponseHandler != nil {
-				rawRequest, rawResponse, handlerErr := customResponseHandler([]byte(jsonData), &response, nil, sendBackRawRequest, sendBackRawResponse)
+				_, _, handlerErr := customResponseHandler([]byte(jsonData), &response, nil, sendBackRawRequest, sendBackRawResponse)
 				if handlerErr != nil {
-					if sendBackRawRequest {
-						handlerErr.ExtraFields.RawRequest = rawRequest
-					}
-					if sendBackRawResponse {
-						handlerErr.ExtraFields.RawResponse = rawResponse
-					}
 					ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
-					providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, handlerErr, jsonBody, nil, sendBackRawRequest, sendBackRawResponse), responseChan, logger, postHookSpanFinalizer)
+					providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, handlerErr, jsonBody, []byte(jsonData), sendBackRawRequest, sendBackRawResponse), responseChan, logger, postHookSpanFinalizer)
 					return
 				}
 			} else {
@@ -1734,18 +1720,11 @@ func HandleOpenAIResponsesStreaming(
 
 			// Parse into bifrost response
 			var response schemas.BifrostResponsesStreamResponse
-			// TODO fix this
 			if customResponseHandler != nil {
-				rawRequest, rawResponse, bifrostErr := customResponseHandler([]byte(jsonData), &response, nil, false, false)
+				_, _, bifrostErr := customResponseHandler([]byte(jsonData), &response, nil, false, false)
 				if bifrostErr != nil {
-					if sendBackRawRequest {
-						bifrostErr.ExtraFields.RawRequest = rawRequest
-					}
-					if sendBackRawResponse {
-						bifrostErr.ExtraFields.RawResponse = rawResponse
-					}
 					ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
-					providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, bifrostErr, jsonBody, nil, sendBackRawRequest, sendBackRawResponse), responseChan, logger, postHookSpanFinalizer)
+					providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, bifrostErr, jsonBody, []byte(jsonData), sendBackRawRequest, sendBackRawResponse), responseChan, logger, postHookSpanFinalizer)
 					return
 				}
 			} else {
@@ -2768,15 +2747,11 @@ func HandleOpenAITranscriptionStreamRequest(
 				break
 			}
 			jsonData := string(data)
-			// TODo fix this
 			response := &schemas.BifrostTranscriptionStreamResponse{}
 			var bifrostErr *schemas.BifrostError
 			if customResponseHandler != nil {
 				_, _, bifrostErr = customResponseHandler([]byte(jsonData), response, nil, false, false)
 				if bifrostErr != nil {
-					if sendBackRawResponse {
-						bifrostErr.ExtraFields.RawResponse = jsonData
-					}
 					ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
 					providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, bifrostErr, body.Bytes(), []byte(jsonData), false, sendBackRawResponse), responseChan, logger, postHookSpanFinalizer)
 					return
