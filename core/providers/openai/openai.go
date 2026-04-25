@@ -785,7 +785,7 @@ func HandleOpenAIChatCompletionRequest(
 				},
 				ExtraFields: schemas.BifrostErrorExtraFields{
 					Provider:       providerName,
-					ModelRequested: request.Model,
+					OriginalModelRequested: request.Model,
 					RequestType:    schemas.ChatCompletionRequest,
 				},
 			}
