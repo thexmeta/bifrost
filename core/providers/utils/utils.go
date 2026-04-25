@@ -1712,10 +1712,8 @@ func SendCreatedEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner 
 			Latency:    time.Since(startTime).Milliseconds(),
 		},
 	}
-	// TODO add bifrost response pooling here
-	bifrostResponse := &schemas.BifrostResponse{
-		ResponsesStreamResponse: firstChunk,
-	}
+	bifrostResponse := schemas.GetBifrostResponse()
+	bifrostResponse.ResponsesStreamResponse = firstChunk
 	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan, postHookSpanFinalizer)
 }
 
@@ -1730,10 +1728,8 @@ func SendInProgressEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunn
 			Latency:    time.Since(startTime).Milliseconds(),
 		},
 	}
-	// TODO add bifrost response pooling here
-	bifrostResponse := &schemas.BifrostResponse{
-		ResponsesStreamResponse: chunk,
-	}
+	bifrostResponse := schemas.GetBifrostResponse()
+	bifrostResponse.ResponsesStreamResponse = chunk
 	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan, postHookSpanFinalizer)
 }
 
@@ -1849,6 +1845,7 @@ func ProcessAndSendResponse(
 	responseChan chan *schemas.BifrostStreamChunk,
 	postHookSpanFinalizer func(context.Context),
 ) {
+	defer response.Release()
 	// Accumulate chunk for tracing (common for all providers)
 	if tracer, ok := ctx.Value(schemas.BifrostContextKeyTracer).(schemas.Tracer); ok && tracer != nil {
 		if traceID, ok := ctx.Value(schemas.BifrostContextKeyTraceID).(string); ok && traceID != "" {
@@ -1858,6 +1855,9 @@ func ProcessAndSendResponse(
 
 	// Run post hooks on the response (note: accumulated chunks above contain pre-hook data)
 	processedResponse, processedError := postHookRunner(ctx, response, nil)
+	if processedResponse != nil && processedResponse != response {
+		defer processedResponse.Release()
+	}
 
 	if HandleStreamControlSkip(processedError) {
 		// Even if skipping, complete the deferred span if this is the final chunk
@@ -1900,6 +1900,9 @@ func ProcessAndSendBifrostError(
 ) {
 	// Run post hooks first so span reflects post-processed data
 	processedResponse, processedError := postHookRunner(ctx, nil, bifrostErr)
+	if processedResponse != nil {
+		defer processedResponse.Release()
+	}
 
 	if HandleStreamControlSkip(processedError) {
 		// Even if skipping, complete the deferred span if this is the final chunk
@@ -2152,6 +2155,9 @@ func ProcessAndSendError(
 		},
 	}
 	processedResponse, processedError := postHookRunner(ctx, nil, bifrostError)
+	if processedResponse != nil {
+		defer processedResponse.Release()
+	}
 
 	if HandleStreamControlSkip(processedError) {
 		return
@@ -2312,8 +2318,7 @@ func GetBifrostResponseForStreamResponse(
 	transcriptionStreamResponse *schemas.BifrostTranscriptionStreamResponse,
 	imageGenerationStreamResponse *schemas.BifrostImageGenerationStreamResponse,
 ) *schemas.BifrostResponse {
-	// TODO add bifrost response pooling here
-	bifrostResponse := &schemas.BifrostResponse{}
+	bifrostResponse := schemas.GetBifrostResponse()
 
 	switch {
 	case textCompletionResponse != nil:

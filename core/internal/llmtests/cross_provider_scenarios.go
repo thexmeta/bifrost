@@ -914,7 +914,9 @@ func executeStepWithProvider(t *testing.T, client *bifrost.Bifrost, ctx *schemas
 		if err != nil {
 			return nil, err
 		}
-		return &schemas.BifrostResponse{ResponsesResponse: responsesResponse}, nil
+		resp := schemas.GetBifrostResponse()
+		resp.ResponsesResponse = responsesResponse
+		return resp, nil
 	} else {
 		// Use Chat Completions API
 		request := &schemas.BifrostChatRequest{
@@ -935,7 +937,9 @@ func executeStepWithProvider(t *testing.T, client *bifrost.Bifrost, ctx *schemas
 		if err != nil {
 			return nil, err
 		}
-		return &schemas.BifrostResponse{ChatResponse: chatResponse}, nil
+		resp := schemas.GetBifrostResponse()
+		resp.ChatResponse = chatResponse
+		return resp, nil
 	}
 }
 

@@ -1103,7 +1103,9 @@ func TestBuildClientStreamChunk_ImageGenerationStripping(t *testing.T) {
 		},
 	}
 
-	response := &schemas.BifrostResponse{ImageGenerationStreamResponse: imgResp}
+	response := schemas.GetBifrostResponse()
+	response.ImageGenerationStreamResponse = imgResp
+	defer response.Release()
 
 	t.Run("logging-only: raw fields stripped from image gen chunk, original preserved", func(t *testing.T) {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
@@ -1182,16 +1184,16 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChu
 				ctx.SetValue(schemas.BifrostContextKeyDropRawResponseFromClient, true)
 			}
 
-			response := &schemas.BifrostResponse{
-				ChatResponse: &schemas.BifrostChatResponse{
-					ID:    "chatcmpl-001",
-					Model: "gpt-4",
-					ExtraFields: schemas.BifrostResponseExtraFields{
-						RawRequest:  rawReq,
-						RawResponse: rawResp,
-					},
+			response := schemas.GetBifrostResponse()
+			response.ChatResponse = &schemas.BifrostChatResponse{
+				ID:    "chatcmpl-001",
+				Model: "gpt-4",
+				ExtraFields: schemas.BifrostResponseExtraFields{
+					RawRequest:  rawReq,
+					RawResponse: rawResp,
 				},
 			}
+			defer response.Release()
 
 			passThrough := func(ctx *schemas.BifrostContext, resp *schemas.BifrostResponse, err *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError) {
 				return resp, err
@@ -1287,9 +1289,9 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk(
 			}
 
 			responseChan := make(chan *schemas.BifrostStreamChunk, 1)
-			ProcessAndSendResponse(ctx, errorRunner, &schemas.BifrostResponse{
-				ChatResponse: &schemas.BifrostChatResponse{ID: "chatcmpl-001"},
-			}, responseChan, nil)
+			resp := schemas.GetBifrostResponse()
+			resp.ChatResponse = &schemas.BifrostChatResponse{ID: "chatcmpl-001"}
+			ProcessAndSendResponse(ctx, errorRunner, resp, responseChan, nil)
 
 			chunk := <-responseChan
 			if chunk.BifrostError == nil {

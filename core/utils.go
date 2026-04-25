@@ -255,6 +255,7 @@ func newBifrostMessageChan(message *schemas.BifrostResponse) chan *schemas.Bifro
 
 	go func() {
 		defer close(ch)
+		defer message.Release()
 		ch <- &schemas.BifrostStreamChunk{
 			BifrostTextCompletionResponse:      message.TextCompletionResponse,
 			BifrostChatResponse:                message.ChatResponse,
@@ -610,14 +611,20 @@ func wrapConvertedStreamPostHookRunner(postHookRunner schemas.PostHookRunner, ta
 				// text→chat: convert chat stream chunk back to text completion
 				if result.ChatResponse != nil {
 					if converted := result.ChatResponse.ToBifrostTextCompletionResponse(); converted != nil {
-						result = &schemas.BifrostResponse{TextCompletionResponse: converted}
+						newResult := schemas.GetBifrostResponse()
+						newResult.TextCompletionResponse = converted
+						result.Release()
+						result = newResult
 					}
 				}
 			case schemas.ResponsesRequest:
 				// chat→responses: convert responses stream chunk back to chat
 				if result.ResponsesStreamResponse != nil {
 					if converted := result.ResponsesStreamResponse.ToBifrostChatResponse(); converted != nil {
-						result = &schemas.BifrostResponse{ChatResponse: converted}
+						newResult := schemas.GetBifrostResponse()
+						newResult.ChatResponse = converted
+						result.Release()
+						result = newResult
 					}
 				}
 			}
