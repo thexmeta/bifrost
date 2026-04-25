@@ -2510,28 +2510,7 @@ func HandleOpenAITranscriptionRequest(
 	} else if customResponseHandler != nil {
 		_, rawResponse, bifrostErr = customResponseHandler(copiedResponseBody, response, nil, false, sendBackRawResponse)
 	} else {
-		if err := sonic.Unmarshal(copiedResponseBody, response); err != nil {
-			// Check if it's an HTML response
-			if providerUtils.IsHTMLResponse(resp, copiedResponseBody) {
-				return nil, &schemas.BifrostError{
-					IsBifrostError: false,
-					Error: &schemas.ErrorField{
-						Message: schemas.ErrProviderResponseHTML,
-						Error:   errors.New(string(copiedResponseBody)),
-					},
-				}
-			}
-			return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderResponseUnmarshal, err)
-		}
-
-		// TODO: add HandleProviderResponse here
-
-		// Parse raw response for RawResponse field
-		if sendBackRawResponse {
-			if err := sonic.Unmarshal(copiedResponseBody, &rawResponse); err != nil {
-				return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRawResponseUnmarshal, err)
-			}
-		}
+		_, rawResponse, bifrostErr = providerUtils.HandleProviderResponse(copiedResponseBody, response, nil, false, sendBackRawResponse)
 	}
 
 	if bifrostErr != nil {
