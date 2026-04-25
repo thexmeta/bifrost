@@ -1747,27 +1747,42 @@ func (gs *LocalGovernanceStore) loadFromConfigMemory(ctx context.Context, config
 	// Load routing rules
 	routingRules := config.RoutingRules
 
+	// Create lookup maps for faster relationship hydration
+	budgetsMap := make(map[string]*configstoreTables.TableBudget, len(budgets))
+	for i := range budgets {
+		budgetsMap[budgets[i].ID] = &budgets[i]
+	}
+
+	rateLimitsMap := make(map[string]*configstoreTables.TableRateLimit, len(rateLimits))
+	for i := range rateLimits {
+		rateLimitsMap[rateLimits[i].ID] = &rateLimits[i]
+	}
+
+	teamsMap := make(map[string]*configstoreTables.TableTeam, len(teams))
+	for i := range teams {
+		teamsMap[teams[i].ID] = &teams[i]
+	}
+
+	customersMap := make(map[string]*configstoreTables.TableCustomer, len(customers))
+	for i := range customers {
+		customersMap[customers[i].ID] = &customers[i]
+	}
+
 	// Populate model configs with their relationships (Budget and RateLimit)
 	for i := range modelConfigs {
 		mc := &modelConfigs[i]
 
 		// Populate budget
 		if mc.BudgetID != nil {
-			for j := range budgets {
-				if budgets[j].ID == *mc.BudgetID {
-					mc.Budget = &budgets[j]
-					break
-				}
+			if b, ok := budgetsMap[*mc.BudgetID]; ok {
+				mc.Budget = b
 			}
 		}
 
 		// Populate rate limit
 		if mc.RateLimitID != nil {
-			for j := range rateLimits {
-				if rateLimits[j].ID == *mc.RateLimitID {
-					mc.RateLimit = &rateLimits[j]
-					break
-				}
+			if rl, ok := rateLimitsMap[*mc.RateLimitID]; ok {
+				mc.RateLimit = rl
 			}
 		}
 
@@ -1780,21 +1795,15 @@ func (gs *LocalGovernanceStore) loadFromConfigMemory(ctx context.Context, config
 
 		// Populate budget
 		if provider.BudgetID != nil {
-			for j := range budgets {
-				if budgets[j].ID == *provider.BudgetID {
-					provider.Budget = &budgets[j]
-					break
-				}
+			if b, ok := budgetsMap[*provider.BudgetID]; ok {
+				provider.Budget = b
 			}
 		}
 
 		// Populate rate limit
 		if provider.RateLimitID != nil {
-			for j := range rateLimits {
-				if rateLimits[j].ID == *provider.RateLimitID {
-					provider.RateLimit = &rateLimits[j]
-					break
-				}
+			if rl, ok := rateLimitsMap[*provider.RateLimitID]; ok {
+				provider.RateLimit = rl
 			}
 		}
 
@@ -1805,21 +1814,21 @@ func (gs *LocalGovernanceStore) loadFromConfigMemory(ctx context.Context, config
 	for i := range virtualKeys {
 		vk := &virtualKeys[i]
 
-		for i := range teams {
-			if vk.TeamID != nil && teams[i].ID == *vk.TeamID {
-				vk.Team = &teams[i]
+		if vk.TeamID != nil {
+			if t, ok := teamsMap[*vk.TeamID]; ok {
+				vk.Team = t
 			}
 		}
 
-		for i := range customers {
-			if vk.CustomerID != nil && customers[i].ID == *vk.CustomerID {
-				vk.Customer = &customers[i]
+		if vk.CustomerID != nil {
+			if c, ok := customersMap[*vk.CustomerID]; ok {
+				vk.Customer = c
 			}
 		}
 
-		for i := range rateLimits {
-			if vk.RateLimitID != nil && rateLimits[i].ID == *vk.RateLimitID {
-				vk.RateLimit = &rateLimits[i]
+		if vk.RateLimitID != nil {
+			if rl, ok := rateLimitsMap[*vk.RateLimitID]; ok {
+				vk.RateLimit = rl
 			}
 		}
 
@@ -1830,11 +1839,8 @@ func (gs *LocalGovernanceStore) loadFromConfigMemory(ctx context.Context, config
 
 				// Populate rate limit
 				if pc.RateLimitID != nil {
-					for k := range rateLimits {
-						if rateLimits[k].ID == *pc.RateLimitID {
-							pc.RateLimit = &rateLimits[k]
-							break
-						}
+					if rl, ok := rateLimitsMap[*pc.RateLimitID]; ok {
+						pc.RateLimit = rl
 					}
 				}
 			}
