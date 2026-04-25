@@ -166,8 +166,18 @@ func parseDataURIImage(dataURI string) (base64Data string, mimeType string) {
 	return parts[1], mimeType
 }
 
-// versionIDPattern matches a 64-character hexadecimal string (Replicate version ID format)
-var versionIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+var (
+	// versionIDPattern matches a 64-character hexadecimal string (Replicate version ID format)
+	versionIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+
+	// Patterns for extracting token usage from logs
+	inputTokenPattern      = regexp.MustCompile(`Input token count:\s*(\d+)`)
+	inputTextTokenPattern  = regexp.MustCompile(`Input text token count:\s*(\d+)`)
+	inputImageTokenPattern = regexp.MustCompile(`Input image token count:\s*(\d+)`)
+	outputTokenPattern     = regexp.MustCompile(`Output token count:\s*(\d+)`)
+	totalTokenPattern      = regexp.MustCompile(`Total token count:\s*(\d+)`)
+	simpleTokenPattern     = regexp.MustCompile(`Tokens:\s*(\d+)`)
+)
 
 // isVersionID checks if a string is a Replicate version ID (64-character hex string)
 func isVersionID(s string) bool {
@@ -208,23 +218,21 @@ func parseTokenUsageFromLogs(logs *string, requestType schemas.RequestType) (inp
 
 	// Pattern 1: Detailed format with input/output breakdown
 	// "Input token count: 20"
-	// "Input text token count: 15"
-	inputPatterns := []string{
-		`Input token count:\s*(\d+)`,
-		`Input text token count:\s*(\d+)`,
-	}
-	for _, pattern := range inputPatterns {
-		if matches := regexp.MustCompile(pattern).FindStringSubmatch(logText); len(matches) > 1 {
-			if val, err := strconv.Atoi(matches[1]); err == nil {
-				inputTokens = val
-				foundAny = true
-				break
-			}
+	if matches := inputTokenPattern.FindStringSubmatch(logText); len(matches) > 1 {
+		if val, err := strconv.Atoi(matches[1]); err == nil {
+			inputTokens = val
+			foundAny = true
+		}
+	} else if matches := inputTextTokenPattern.FindStringSubmatch(logText); len(matches) > 1 {
+		// "Input text token count: 15"
+		if val, err := strconv.Atoi(matches[1]); err == nil {
+			inputTokens = val
+			foundAny = true
 		}
 	}
 
 	// "Input image token count: 0" (for image generation)
-	if matches := regexp.MustCompile(`Input image token count:\s*(\d+)`).FindStringSubmatch(logText); len(matches) > 1 {
+	if matches := inputImageTokenPattern.FindStringSubmatch(logText); len(matches) > 1 {
 		if val, err := strconv.Atoi(matches[1]); err == nil {
 			inputTokens += val // Add to text input tokens
 			foundAny = true
@@ -232,7 +240,7 @@ func parseTokenUsageFromLogs(logs *string, requestType schemas.RequestType) (inp
 	}
 
 	// "Output token count: 28"
-	if matches := regexp.MustCompile(`Output token count:\s*(\d+)`).FindStringSubmatch(logText); len(matches) > 1 {
+	if matches := outputTokenPattern.FindStringSubmatch(logText); len(matches) > 1 {
 		if val, err := strconv.Atoi(matches[1]); err == nil {
 			outputTokens = val
 			foundAny = true
@@ -240,7 +248,7 @@ func parseTokenUsageFromLogs(logs *string, requestType schemas.RequestType) (inp
 	}
 
 	// "Total token count: 48"
-	if matches := regexp.MustCompile(`Total token count:\s*(\d+)`).FindStringSubmatch(logText); len(matches) > 1 {
+	if matches := totalTokenPattern.FindStringSubmatch(logText); len(matches) > 1 {
 		if val, err := strconv.Atoi(matches[1]); err == nil {
 			totalTokens = val
 			foundAny = true
@@ -250,7 +258,7 @@ func parseTokenUsageFromLogs(logs *string, requestType schemas.RequestType) (inp
 	// Pattern 2: Simple "Tokens: X" format (ambiguous - need heuristic)
 	// Only use if detailed format not found
 	if !foundAny {
-		if matches := regexp.MustCompile(`Tokens:\s*(\d+)`).FindStringSubmatch(logText); len(matches) > 1 {
+		if matches := simpleTokenPattern.FindStringSubmatch(logText); len(matches) > 1 {
 			if val, err := strconv.Atoi(matches[1]); err == nil {
 				// Heuristic based on response type
 				switch requestType {
