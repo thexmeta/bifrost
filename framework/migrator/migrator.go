@@ -547,7 +547,11 @@ func (g *Gormigrate) unknownMigrationsHaveHappened() (bool, error) {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			g.tx.Logger.Error(context.TODO(), err.Error())
+			ctx := context.Background()
+			if g.tx != nil && g.tx.Statement != nil && g.tx.Statement.Context != nil {
+				ctx = g.tx.Statement.Context
+			}
+			g.tx.Logger.Error(ctx, err.Error())
 		}
 	}()
 
