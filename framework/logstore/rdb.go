@@ -2717,14 +2717,15 @@ var allowedKeyPairColumns = map[string]struct{}{
 // GetDistinctKeyPairs returns unique non-empty ID-Name pairs for the given columns using SELECT DISTINCT.
 // idCol and nameCol must be valid column names (e.g., "selected_key_id", "selected_key_name").
 func (s *RDBLogStore) GetDistinctKeyPairs(ctx context.Context, idCol, nameCol string) ([]KeyPairResult, error) {
-	if s.db.Dialector.Name() == "postgres" && s.matViewsReady.Load() {
-		return s.getDistinctKeyPairsFromMatView(ctx, idCol, nameCol)
-	}
 	if _, ok := allowedKeyPairColumns[idCol]; !ok {
 		return nil, fmt.Errorf("invalid id column: %s", idCol)
 	}
 	if _, ok := allowedKeyPairColumns[nameCol]; !ok {
 		return nil, fmt.Errorf("invalid name column: %s", nameCol)
+	}
+
+	if s.db.Dialector.Name() == "postgres" && s.matViewsReady.Load() {
+		return s.getDistinctKeyPairsFromMatView(ctx, idCol, nameCol)
 	}
 	cutoff := time.Now().UTC().AddDate(0, 0, -defaultFilterDataCutoffDays)
 	var results []KeyPairResult
