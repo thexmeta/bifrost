@@ -4259,16 +4259,21 @@ func (provider *GeminiProvider) PassthroughStream(
 					if !fullResponseBodyTruncated {
 						capturedBody = append([]byte(nil), fullResponseBody...)
 					}
-					finalResp := &schemas.BifrostResponse{
-						PassthroughResponse: &schemas.BifrostPassthroughResponse{
-							StatusCode:    statusCode,
-							Headers:       headers,
-							Body:          capturedBody,
-							BodyTruncated: fullResponseBodyTruncated,
-							ExtraFields:   extraFields,
-						},
+					finalResp := schemas.GetBifrostResponse()
+					finalResp.PassthroughResponse = &schemas.BifrostPassthroughResponse{
+						StatusCode:    statusCode,
+						Headers:       headers,
+						Body:          capturedBody,
+						BodyTruncated: fullResponseBodyTruncated,
+						ExtraFields:   extraFields,
 					}
-					postHookRunner(ctx, finalResp, nil)
+					processedResp, _ := postHookRunner(ctx, finalResp, nil)
+					if processedResp != nil {
+						processedResp.Release()
+					}
+					if finalResp != processedResp {
+						finalResp.Release()
+					}
 					return
 				}
 			}
@@ -4279,16 +4284,21 @@ func (provider *GeminiProvider) PassthroughStream(
 				if !fullResponseBodyTruncated {
 					capturedBody = append([]byte(nil), fullResponseBody...)
 				}
-				finalResp := &schemas.BifrostResponse{
-					PassthroughResponse: &schemas.BifrostPassthroughResponse{
-						StatusCode:    statusCode,
-						Headers:       headers,
-						Body:          capturedBody,
-						BodyTruncated: fullResponseBodyTruncated,
-						ExtraFields:   extraFields,
-					},
+				finalResp := schemas.GetBifrostResponse()
+				finalResp.PassthroughResponse = &schemas.BifrostPassthroughResponse{
+					StatusCode:    statusCode,
+					Headers:       headers,
+					Body:          capturedBody,
+					BodyTruncated: fullResponseBodyTruncated,
+					ExtraFields:   extraFields,
 				}
-				postHookRunner(ctx, finalResp, nil)
+				processedResp, _ := postHookRunner(ctx, finalResp, nil)
+				if processedResp != nil {
+					processedResp.Release()
+				}
+				if finalResp != processedResp {
+					finalResp.Release()
+				}
 				return
 			}
 			if readErr != nil {

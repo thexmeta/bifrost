@@ -2712,14 +2712,19 @@ func (provider *AnthropicProvider) PassthroughStream(
 			if readErr == io.EOF {
 				ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
 				extraFields.Latency = time.Since(startTime).Milliseconds()
-				finalResp := &schemas.BifrostResponse{
-					PassthroughResponse: &schemas.BifrostPassthroughResponse{
-						StatusCode:  statusCode,
-						Headers:     headers,
-						ExtraFields: extraFields,
-					},
+				finalResp := schemas.GetBifrostResponse()
+				finalResp.PassthroughResponse = &schemas.BifrostPassthroughResponse{
+					StatusCode:  statusCode,
+					Headers:     headers,
+					ExtraFields: extraFields,
 				}
-				postHookRunner(ctx, finalResp, nil)
+				processedResp, _ := postHookRunner(ctx, finalResp, nil)
+				if processedResp != nil {
+					processedResp.Release()
+				}
+				if finalResp != processedResp {
+					finalResp.Release()
+				}
 				if postHookSpanFinalizer != nil {
 					postHookSpanFinalizer(ctx)
 				}

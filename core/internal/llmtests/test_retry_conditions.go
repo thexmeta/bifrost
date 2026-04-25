@@ -663,12 +663,12 @@ func (c *IncompleteStreamCondition) ShouldRetry(response *schemas.BifrostRespons
 			finishReason := string(*choice.FinishReason)
 			if finishReason == "length" {
 				// This might be okay depending on context, but could indicate truncation
-				singleChoiceResponse := &schemas.BifrostResponse{
-					ChatResponse: &schemas.BifrostChatResponse{
-						Choices: []schemas.BifrostResponseChoice{choice},
-					},
+				singleChoiceResponse := schemas.GetBifrostResponse()
+				singleChoiceResponse.ChatResponse = &schemas.BifrostChatResponse{
+					Choices: []schemas.BifrostResponseChoice{choice},
 				}
 				choiceContent := GetResultContent(singleChoiceResponse)
+				singleChoiceResponse.Release()
 				if len(choiceContent) < 10 {
 					return true, fmt.Sprintf("choice %d finished due to length but content is very short", i)
 				}
@@ -685,12 +685,12 @@ func (c *IncompleteStreamCondition) ShouldRetry(response *schemas.BifrostRespons
 			finishReason := string(*choice.FinishReason)
 			if finishReason == "length" {
 				// This might be okay depending on context, but could indicate truncation
-				singleChoiceResponse := &schemas.BifrostResponse{
-					TextCompletionResponse: &schemas.BifrostTextCompletionResponse{
-						Choices: []schemas.BifrostResponseChoice{choice},
-					},
+				singleChoiceResponse := schemas.GetBifrostResponse()
+				singleChoiceResponse.TextCompletionResponse = &schemas.BifrostTextCompletionResponse{
+					Choices: []schemas.BifrostResponseChoice{choice},
 				}
 				choiceContent := GetResultContent(singleChoiceResponse)
+				singleChoiceResponse.Release()
 				if len(choiceContent) < 10 {
 					return true, fmt.Sprintf("choice %d finished due to length but content is very short", i)
 				}

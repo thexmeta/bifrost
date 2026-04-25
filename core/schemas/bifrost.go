@@ -14,6 +14,24 @@ const (
 
 type KeySelector func(ctx *BifrostContext, keys []Key, providerKey ModelProvider, model string) (Key, error)
 
+var bifrostResponsePool = sync.Pool{
+	New: func() interface{} {
+		return &BifrostResponse{}
+	},
+}
+
+// GetBifrostResponse returns a BifrostResponse from the pool.
+func GetBifrostResponse() *BifrostResponse {
+	return bifrostResponsePool.Get().(*BifrostResponse)
+}
+
+// PrewarmBifrostResponsePool prewarms the BifrostResponse pool with the given size.
+func PrewarmBifrostResponsePool(size int) {
+	for range size {
+		bifrostResponsePool.Put(&BifrostResponse{})
+	}
+}
+
 // BifrostConfig represents the configuration for initializing a Bifrost instance.
 // It contains the necessary components for setting up the system including account details,
 // plugins, logging, and initial pool size.
@@ -771,6 +789,59 @@ type BifrostResponse struct {
 	ContainerFileContentResponse  *BifrostContainerFileContentResponse
 	ContainerFileDeleteResponse   *BifrostContainerFileDeleteResponse
 	PassthroughResponse           *BifrostPassthroughResponse
+}
+
+// Reset resets the BifrostResponse for reuse in the pool.
+func (r *BifrostResponse) Reset() {
+	r.ListModelsResponse = nil
+	r.TextCompletionResponse = nil
+	r.ChatResponse = nil
+	r.ResponsesResponse = nil
+	r.ResponsesStreamResponse = nil
+	r.CountTokensResponse = nil
+	r.EmbeddingResponse = nil
+	r.RerankResponse = nil
+	r.OCRResponse = nil
+	r.SpeechResponse = nil
+	r.SpeechStreamResponse = nil
+	r.TranscriptionResponse = nil
+	r.TranscriptionStreamResponse = nil
+	r.ImageGenerationResponse = nil
+	r.ImageGenerationStreamResponse = nil
+	r.VideoGenerationResponse = nil
+	r.VideoDownloadResponse = nil
+	r.VideoListResponse = nil
+	r.VideoDeleteResponse = nil
+	r.FileUploadResponse = nil
+	r.FileListResponse = nil
+	r.FileRetrieveResponse = nil
+	r.FileDeleteResponse = nil
+	r.FileContentResponse = nil
+	r.BatchCreateResponse = nil
+	r.BatchListResponse = nil
+	r.BatchRetrieveResponse = nil
+	r.BatchCancelResponse = nil
+	r.BatchResultsResponse = nil
+	r.BatchDeleteResponse = nil
+	r.ContainerCreateResponse = nil
+	r.ContainerListResponse = nil
+	r.ContainerRetrieveResponse = nil
+	r.ContainerDeleteResponse = nil
+	r.ContainerFileCreateResponse = nil
+	r.ContainerFileListResponse = nil
+	r.ContainerFileRetrieveResponse = nil
+	r.ContainerFileContentResponse = nil
+	r.ContainerFileDeleteResponse = nil
+	r.PassthroughResponse = nil
+}
+
+// Release resets the response and returns it to the pool.
+func (r *BifrostResponse) Release() {
+	if r == nil {
+		return
+	}
+	r.Reset()
+	bifrostResponsePool.Put(r)
 }
 
 func (r *BifrostResponse) GetExtraFields() *BifrostResponseExtraFields {
