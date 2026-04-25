@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+"time"
 	"testing"
 
 	"github.com/maximhq/bifrost/core/schemas"
@@ -1003,5 +1004,160 @@ func TestParseAndAddToolsToRequest_OpenCode_NoDuplicate(t *testing.T) {
 			t.Errorf("OpenCode: expected exactly 1 %q, got %d (names: %v)",
 				prefixed, countOccurrences(names, prefixed), names)
 		}
+	}
+}
+
+// MockCodeMode implements CodeMode for testing.
+type MockCodeMode struct {
+}
+
+func (m *MockCodeMode) GetTools() []schemas.ChatTool {
+	return nil
+}
+
+func (m *MockCodeMode) ExecuteTool(ctx *schemas.BifrostContext, toolCall schemas.ChatAssistantMessageToolCall) (*schemas.ChatMessage, error) {
+	return nil, nil
+}
+
+func (m *MockCodeMode) IsCodeModeTool(toolName string) bool {
+	return false
+}
+
+func (m *MockCodeMode) GetBindingLevel() schemas.CodeModeBindingLevel {
+	return schemas.CodeModeBindingLevelServer
+}
+
+func (m *MockCodeMode) UpdateConfig(config *CodeModeConfig) {
+}
+
+func (m *MockCodeMode) SetDependencies(deps *CodeModeDependencies) {
+}
+
+// MockOAuth2Provider implements OAuth2Provider for testing.
+type MockOAuth2Provider struct {
+}
+
+func (m *MockOAuth2Provider) GetAccessToken(ctx context.Context, oauthConfigID string) (string, error) {
+	return "", nil
+}
+
+func (m *MockOAuth2Provider) RefreshAccessToken(ctx context.Context, oauthConfigID string) error {
+	return nil
+}
+
+func (m *MockOAuth2Provider) ValidateToken(ctx context.Context, oauthConfigID string) (bool, error) {
+	return true, nil
+}
+
+func (m *MockOAuth2Provider) RevokeToken(ctx context.Context, oauthConfigID string) error {
+	return nil
+}
+
+func (m *MockOAuth2Provider) GetUserAccessToken(ctx context.Context, sessionToken string) (string, error) {
+	return "", nil
+}
+
+func (m *MockOAuth2Provider) GetUserAccessTokenByIdentity(ctx context.Context, virtualKeyID, userID, sessionToken, mcpClientID string) (string, error) {
+	return "", nil
+}
+
+func (m *MockOAuth2Provider) InitiateUserOAuthFlow(ctx context.Context, oauthConfigID string, mcpClientID string, redirectURI string) (*schemas.OAuth2FlowInitiation, string, error) {
+	return nil, "", nil
+}
+
+func (m *MockOAuth2Provider) CompleteUserOAuthFlow(ctx context.Context, state string, code string) (string, error) {
+	return "", nil
+}
+
+func (m *MockOAuth2Provider) RefreshUserAccessToken(ctx context.Context, sessionToken string) error {
+	return nil
+}
+
+func (m *MockOAuth2Provider) RevokeUserToken(ctx context.Context, sessionToken string) error {
+	return nil
+}
+
+func TestNewToolsManagerWithCodeMode_Defaults(t *testing.T) {
+	t.Parallel()
+
+	cm := &mockToolClientManager{}
+	oauth2Provider := &MockOAuth2Provider{}
+
+	tm := NewToolsManagerWithCodeMode(
+		nil,
+		cm,
+		nil, // fetchNewRequestIDFunc
+		nil, // pluginPipelineProvider
+		nil, // releasePluginPipeline
+		nil, // codeMode
+		oauth2Provider,
+		nil, // logger (should default to defaultLogger)
+	)
+
+	if tm == nil {
+		t.Fatal("Expected ToolsManager to be created")
+	}
+
+	if timeout := tm.toolExecutionTimeout.Load().(time.Duration); timeout != schemas.DefaultToolExecutionTimeout {
+		t.Errorf("Expected default tool execution timeout %v, got %v", schemas.DefaultToolExecutionTimeout, timeout)
+	}
+
+	if maxDepth := tm.maxAgentDepth.Load(); maxDepth != schemas.DefaultMaxAgentDepth {
+		t.Errorf("Expected default max agent depth %d, got %d", schemas.DefaultMaxAgentDepth, maxDepth)
+	}
+
+	if tm.GetCodeMode() != nil {
+		t.Errorf("Expected nil code mode, got %v", tm.GetCodeMode())
+	}
+}
+
+func TestNewToolsManagerWithCodeMode_CustomConfig(t *testing.T) {
+	t.Parallel()
+
+	cm := &mockToolClientManager{}
+	oauth2Provider := &MockOAuth2Provider{}
+	mockCodeMode := &MockCodeMode{}
+	mockLogger := &MockLogger{}
+
+	customConfig := &schemas.MCPToolManagerConfig{
+		ToolExecutionTimeout:  5 * time.Minute,
+		MaxAgentDepth:         42,
+		CodeModeBindingLevel:  schemas.CodeModeBindingLevelTool,
+		DisableAutoToolInject: true,
+	}
+
+	tm := NewToolsManagerWithCodeMode(
+		customConfig,
+		cm,
+		nil, // fetchNewRequestIDFunc
+		nil, // pluginPipelineProvider
+		nil, // releasePluginPipeline
+		mockCodeMode,
+		oauth2Provider,
+		mockLogger,
+	)
+
+	if tm == nil {
+		t.Fatal("Expected ToolsManager to be created")
+	}
+
+	if timeout := tm.toolExecutionTimeout.Load().(time.Duration); timeout != 5*time.Minute {
+		t.Errorf("Expected custom tool execution timeout %v, got %v", 5*time.Minute, timeout)
+	}
+
+	if maxDepth := tm.maxAgentDepth.Load(); maxDepth != 42 {
+		t.Errorf("Expected custom max agent depth 42, got %d", maxDepth)
+	}
+
+	if autoToolInjectDisabled := tm.disableAutoToolInject.Load(); autoToolInjectDisabled != true {
+		t.Errorf("Expected DisableAutoToolInject to be true, got %v", autoToolInjectDisabled)
+	}
+
+	if tm.GetCodeMode() != mockCodeMode {
+		t.Errorf("Expected mock code mode, got %v", tm.GetCodeMode())
+	}
+
+	if tm.oauth2Provider != oauth2Provider {
+		t.Errorf("Expected mock oauth2 provider, got %v", tm.oauth2Provider)
 	}
 }
