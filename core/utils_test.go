@@ -50,3 +50,62 @@ func TestCanProviderKeyValueBeEmpty(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSupportedBaseProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider schemas.ModelProvider
+		expected bool
+	}{
+		{"Anthropic", schemas.Anthropic, true},
+		{"Bedrock", schemas.Bedrock, true},
+		{"Cohere", schemas.Cohere, true},
+		{"Gemini", schemas.Gemini, true},
+		{"OpenAI", schemas.OpenAI, true},
+		{"HuggingFace", schemas.HuggingFace, true},
+		{"Replicate", schemas.Replicate, true},
+		{"NvidiaNIM", schemas.NvidiaNIM, true},
+
+		{"Azure", schemas.Azure, false},
+		{"Mistral", schemas.Mistral, false},
+		{"Ollama", schemas.Ollama, false},
+		{"Groq", schemas.Groq, false},
+		{"CustomProvider", schemas.ModelProvider("my-custom-provider"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsSupportedBaseProvider(tt.provider)
+			if result != tt.expected {
+				t.Errorf("IsSupportedBaseProvider(%v) = %v; want %v", tt.provider, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsStandardProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider schemas.ModelProvider
+		expected bool
+	}{
+		{"OpenAI", schemas.OpenAI, true},
+		{"Azure", schemas.Azure, true},
+		{"Anthropic", schemas.Anthropic, true},
+		{"Bedrock", schemas.Bedrock, true},
+		{"Mistral", schemas.Mistral, true},
+		{"Ollama", schemas.Ollama, true},
+
+		{"CustomProvider", schemas.ModelProvider("my-custom-provider"), false},
+		{"EmptyProvider", schemas.ModelProvider(""), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsStandardProvider(tt.provider)
+			if result != tt.expected {
+				t.Errorf("IsStandardProvider(%v) = %v; want %v", tt.provider, result, tt.expected)
+			}
+		})
+	}
+}
