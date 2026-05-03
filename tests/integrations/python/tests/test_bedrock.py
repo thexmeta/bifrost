@@ -158,13 +158,15 @@ def create_bedrock_batch_jsonl(model_id: str, num_requests: int = 2) -> str:
     lines = []
     for i in range(num_requests):
         record = {
-            "recordId": f"request-{i+1}",
+            "recordId": f"request-{i + 1}",
             "modelInput": {
                 "messages": [
                     {
                         "role": "user",
                         "content": [
-                            {"text": f"Hello, this is test message {i+1}. Say hi back briefly."}
+                            {
+                                "text": f"Hello, this is test message {i + 1}. Say hi back briefly."
+                            }
                         ],
                     }
                 ],
@@ -189,19 +191,23 @@ def create_gemini_batch_jsonl(model_id: str, num_requests: int = 2) -> str:
                     {
                         "role": "user",
                         "parts": [
-                            {"text": f"Hello, this is test message {i+1}. Say hi back briefly."}
+                            {
+                                "text": f"Hello, this is test message {i + 1}. Say hi back briefly."
+                            }
                         ],
                     }
                 ],
                 "generationConfig": {"maxOutputTokens": 100},
             },
-            "metadata": {"key": f"request-{i+1}"},
+            "metadata": {"key": f"request-{i + 1}"},
         }
         lines.append(json.dumps(record))
     return "\n".join(lines)
 
 
-def create_batch_jsonl_for_provider(provider: str, model_id: str, num_requests: int = 2) -> str:
+def create_batch_jsonl_for_provider(
+    provider: str, model_id: str, num_requests: int = 2
+) -> str:
     """Create provider-specific JSONL content for batch processing"""
     if provider == "gemini":
         return create_gemini_batch_jsonl(model_id, num_requests)
@@ -320,7 +326,9 @@ def convert_to_bedrock_messages(messages: List[Dict[str, Any]]) -> List[Dict[str
                         elif url.lower().endswith(".webp"):
                             fmt = "webp"
 
-                        content.append({"image": {"format": fmt, "source": {"bytes": image_bytes}}})
+                        content.append(
+                            {"image": {"format": fmt, "source": {"bytes": image_bytes}}}
+                        )
         else:
             content.append({"text": msg["content"]})
 
@@ -382,12 +390,17 @@ class TestBedrockIntegration:
 
         assert response_body is not None
         assert (
-            "outputs" in response_body or "completion" in response_body or "text" in response_body
+            "outputs" in response_body
+            or "completion" in response_body
+            or "text" in response_body
         )
 
         text = None
         if "outputs" in response_body:
-            if isinstance(response_body["outputs"], list) and len(response_body["outputs"]) > 0:
+            if (
+                isinstance(response_body["outputs"], list)
+                and len(response_body["outputs"]) > 0
+            ):
                 text = response_body["outputs"][0].get("text", "")
         elif "completion" in response_body:
             text = response_body["completion"]
@@ -396,8 +409,12 @@ class TestBedrockIntegration:
 
         assert text is not None and len(text) > 0, "Response should contain text"
 
-    @pytest.mark.parametrize("provider,model", get_cross_provider_params_for_scenario("tool_calls"))
-    def test_02_converse_with_tool_calling(self, bedrock_client, test_config, provider, model):
+    @pytest.mark.parametrize(
+        "provider,model", get_cross_provider_params_for_scenario("tool_calls")
+    )
+    def test_02_converse_with_tool_calling(
+        self, bedrock_client, test_config, provider, model
+    ):
         """Test Case 2: Chat with tool calling and tool result using converse API - runs across all available providers"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
@@ -459,14 +476,16 @@ class TestBedrockIntegration:
         # Validate response structure
         assert_valid_chat_response(final_response)
         assert "output" in final_response
-        assert "message" in final_response["output"], "Response should have message in output"
+        assert "message" in final_response["output"], (
+            "Response should have message in output"
+        )
 
         # Check if response has content
         output_message = final_response["output"]["message"]
         assert "content" in output_message, "Response message should have content"
-        assert (
-            len(output_message["content"]) > 0
-        ), "Response message should have at least one content item"
+        assert len(output_message["content"]) > 0, (
+            "Response message should have at least one content item"
+        )
 
         # Extract text content if available
         text_content = None
@@ -475,7 +494,9 @@ class TestBedrockIntegration:
                 text_content = item["text"]
                 break
 
-        assert text_content is not None, "Final response should contain a text content block"
+        assert text_content is not None, (
+            "Final response should contain a text content block"
+        )
         final_text = text_content.lower()
         assert any(word in final_text for word in WEATHER_KEYWORDS + LOCATION_KEYWORDS)
 
@@ -499,7 +520,9 @@ class TestBedrockIntegration:
                         },
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{BASE64_IMAGE_LARGE}"},
+                            "image_url": {
+                                "url": f"data:image/png;base64,{BASE64_IMAGE_LARGE}"
+                            },
                         },
                     ],
                 }
@@ -529,9 +552,9 @@ class TestBedrockIntegration:
                 text_content = item["text"]
                 break
 
-        assert (
-            text_content is not None and len(text_content) > 0
-        ), "Response should contain text content"
+        assert text_content is not None and len(text_content) > 0, (
+            "Response should contain text content"
+        )
 
         # Check for image-related keywords (more lenient for small test image)
         text_lower = text_content.lower()
@@ -558,7 +581,9 @@ class TestBedrockIntegration:
             f"Got: {text_content[:100]}"
         )
 
-    @pytest.mark.parametrize("provider,model", get_cross_provider_params_for_scenario("streaming"))
+    @pytest.mark.parametrize(
+        "provider,model", get_cross_provider_params_for_scenario("streaming")
+    )
     def test_04_converse_streaming(self, bedrock_client, test_config, provider, model):
         """Test Case 4: Streaming chat completion using converse-stream API with boto3 - runs across all available providers
 
@@ -636,9 +661,9 @@ class TestBedrockIntegration:
             )
 
         # Verify we received streaming chunks
-        assert (
-            len(chunks) > 0
-        ), f"Should receive at least one streaming chunk. Stream completed: {stream_completed}, Total chunks: {len(chunks)}"
+        assert len(chunks) > 0, (
+            f"Should receive at least one streaming chunk. Stream completed: {stream_completed}, Total chunks: {len(chunks)}"
+        )
 
         # Verify we received text content
         combined_text = "".join(text_parts)
@@ -651,9 +676,9 @@ class TestBedrockIntegration:
             )
 
         # Verify we got a reasonable response
-        assert (
-            len(combined_text.strip()) > 0
-        ), f"Streaming response should not be empty. Combined text: {repr(combined_text[:100])}"
+        assert len(combined_text.strip()) > 0, (
+            f"Streaming response should not be empty. Combined text: {repr(combined_text[:100])}"
+        )
 
     @skip_if_no_api_key("bedrock")
     def test_05_invoke_streaming(self, bedrock_client, test_config):
@@ -734,7 +759,9 @@ class TestBedrockIntegration:
                             text_chunk = ""
                             if "outputs" in chunk_json:  # Mistral
                                 if len(chunk_json["outputs"]) > 0:
-                                    text_chunk = chunk_json["outputs"][0].get("text", "")
+                                    text_chunk = chunk_json["outputs"][0].get(
+                                        "text", ""
+                                    )
                             elif "completion" in chunk_json:  # Claude
                                 text_chunk = chunk_json.get("completion", "")
                             elif "outputText" in chunk_json:  # Titan
@@ -751,9 +778,9 @@ class TestBedrockIntegration:
 
         assert len(chunks) > 0, "Should receive at least one streaming chunk"
         combined_text = "".join(text_parts)
-        assert (
-            len(combined_text.strip()) > 0
-        ), f"Streaming response should not be empty. Got: {combined_text}"
+        assert len(combined_text.strip()) > 0, (
+            f"Streaming response should not be empty. Got: {combined_text}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model", get_cross_provider_params_for_scenario("simple_chat")
@@ -778,9 +805,9 @@ class TestBedrockIntegration:
         # Check if response has content
         output_message = response["output"]["message"]
         assert "content" in output_message, "Response message should have content"
-        assert (
-            len(output_message["content"]) > 0
-        ), "Response message should have at least one content item"
+        assert len(output_message["content"]) > 0, (
+            "Response message should have at least one content item"
+        )
 
         # Extract and validate text content
         text_content = None
@@ -793,9 +820,12 @@ class TestBedrockIntegration:
         assert len(text_content) > 0, "Response text should not be empty"
 
     @pytest.mark.parametrize(
-        "provider,model", get_cross_provider_params_for_scenario("multi_turn_conversation")
+        "provider,model",
+        get_cross_provider_params_for_scenario("multi_turn_conversation"),
     )
-    def test_07_multi_turn_conversation(self, bedrock_client, test_config, provider, model):
+    def test_07_multi_turn_conversation(
+        self, bedrock_client, test_config, provider, model
+    ):
         """Test Case 7: Multi-turn conversation using converse API - runs across all available providers"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
@@ -824,10 +854,16 @@ class TestBedrockIntegration:
 
         # Should mention population or numbers since we asked about Paris population
         text_lower = text_content.lower()
-        population_keywords = ["population", "million", "people", "inhabitants", "resident"]
-        assert any(
-            word in text_lower for word in population_keywords
-        ), f"Response should mention population. Got: {text_content[:200]}"
+        population_keywords = [
+            "population",
+            "million",
+            "people",
+            "inhabitants",
+            "resident",
+        ]
+        assert any(word in text_lower for word in population_keywords), (
+            f"Response should mention population. Got: {text_content[:200]}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model", get_cross_provider_params_for_scenario("multiple_tool_calls")
@@ -862,12 +898,16 @@ class TestBedrockIntegration:
 
         # Should call relevant tools
         made_relevant_calls = any(name in expected_tools for name in tool_names)
-        assert made_relevant_calls, f"Expected tool calls from {expected_tools}, got {tool_names}"
+        assert made_relevant_calls, (
+            f"Expected tool calls from {expected_tools}, got {tool_names}"
+        )
 
     @skip_if_no_api_key("bedrock")
     def test_09_system_message(self, bedrock_client, test_config):
         """Test Case 9: System message handling using converse API"""
-        system_content = "You are a helpful assistant that always responds in exactly 5 words."
+        system_content = (
+            "You are a helpful assistant that always responds in exactly 5 words."
+        )
         user_content = "Hello, how are you?"
 
         messages_with_system = [
@@ -902,12 +942,16 @@ class TestBedrockIntegration:
 
         # Check if response is approximately 5 words (allow some flexibility)
         word_count = len(text_content.split())
-        assert 3 <= word_count <= 10, f"Expected ~5 words, got {word_count}: {text_content}"
+        assert 3 <= word_count <= 10, (
+            f"Expected ~5 words, got {word_count}: {text_content}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model", get_cross_provider_params_for_scenario("end2end_tool_calling")
     )
-    def test_10_end2end_tool_calling(self, bedrock_client, test_config, provider, model):
+    def test_10_end2end_tool_calling(
+        self, bedrock_client, test_config, provider, model
+    ):
         """Test Case 10: Complete end-to-end tool calling flow - runs across all available providers
 
         This test covers the full cycle:
@@ -939,11 +983,13 @@ class TestBedrockIntegration:
         tool_calls = extract_tool_calls(response)
 
         # Validate tool call structure
-        assert (
-            tool_calls[0]["name"] == "get_weather"
-        ), f"Expected get_weather tool, got {tool_calls[0]['name']}"
+        assert tool_calls[0]["name"] == "get_weather", (
+            f"Expected get_weather tool, got {tool_calls[0]['name']}"
+        )
         assert "id" in tool_calls[0], "Tool call should have an ID"
-        assert "location" in tool_calls[0]["arguments"], "Tool call should have location argument"
+        assert "location" in tool_calls[0]["arguments"], (
+            "Tool call should have location argument"
+        )
 
         # Step 2: Append assistant response to messages
         assistant_message = response["output"]["message"]
@@ -999,10 +1045,12 @@ class TestBedrockIntegration:
 
         # Should mention weather-related terms or location
         final_text = text_content.lower()
-        weather_location_keywords = WEATHER_KEYWORDS + LOCATION_KEYWORDS + ["san francisco", "sf"]
-        assert any(
-            word in final_text for word in weather_location_keywords
-        ), f"Final response should mention weather or location. Got: {text_content[:200]}"
+        weather_location_keywords = (
+            WEATHER_KEYWORDS + LOCATION_KEYWORDS + ["san francisco", "sf"]
+        )
+        assert any(word in final_text for word in weather_location_keywords), (
+            f"Final response should mention weather or location. Got: {text_content[:200]}"
+        )
 
     # ==================== FILE API TESTS (Multi-Provider via boto3 with x-model-provider header) ====================
 
@@ -1054,7 +1102,9 @@ class TestBedrockIntegration:
         except Exception as e:
             print(f"Warning: Failed to clean up file: {e}")
 
-    @pytest.mark.parametrize("provider,model", get_cross_provider_params_for_scenario("file_list"))
+    @pytest.mark.parametrize(
+        "provider,model", get_cross_provider_params_for_scenario("file_list")
+    )
     def test_12_file_list(self, test_config, provider, model):
         """Test Case 12: List files in S3 bucket
 
@@ -1090,12 +1140,16 @@ class TestBedrockIntegration:
 
         try:
             # List files
-            response = s3_client.list_objects_v2(Bucket=s3_bucket, Prefix="bifrost-test-files/")
+            response = s3_client.list_objects_v2(
+                Bucket=s3_bucket, Prefix="bifrost-test-files/"
+            )
 
             assert "Contents" in response, "Response should contain Contents"
             assert len(response["Contents"]) >= 1, "Should have at least one file"
 
-            print(f"Success: Listed {len(response['Contents'])} files for provider {provider}")
+            print(
+                f"Success: Listed {len(response['Contents'])} files for provider {provider}"
+            )
 
         finally:
             try:
@@ -1142,7 +1196,9 @@ class TestBedrockIntegration:
 
         try:
             # Retrieve file metadata (HEAD request)
-            response = s3_client.head_object(Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id)
+            response = s3_client.head_object(
+                Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id
+            )
             print(f"head response: {response}")
             assert "ContentLength" in response, "Response should contain ContentLength"
             assert response["ContentLength"] > 0, "File should have content"
@@ -1156,7 +1212,9 @@ class TestBedrockIntegration:
 
         finally:
             try:
-                s3_client.delete_object(Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id)
+                s3_client.delete_object(
+                    Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
@@ -1247,13 +1305,15 @@ class TestBedrockIntegration:
 
         try:
             # Download file content (GET request)
-            response = s3_client.get_object(Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id)
+            response = s3_client.get_object(
+                Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id
+            )
             downloaded_content = response["Body"].read().decode("utf-8")
 
             # Verify content matches what we uploaded
-            assert (
-                jsonl_content == downloaded_content
-            ), "Downloaded content should match uploaded content"
+            assert jsonl_content == downloaded_content, (
+                "Downloaded content should match uploaded content"
+            )
 
             # Verify ETag contains file ID
             get_file_id = response.get("ETag", "").strip('"')
@@ -1264,7 +1324,9 @@ class TestBedrockIntegration:
 
         finally:
             try:
-                s3_client.delete_object(Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id)
+                s3_client.delete_object(
+                    Bucket=s3_bucket, Key=s3_key, IfMatch=upload_file_id
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
@@ -1314,7 +1376,9 @@ class TestBedrockIntegration:
                     "s3InputDataConfig": {"s3Uri": input_uri, "s3InputFormat": "JSONL"}
                 },
                 outputDataConfig={
-                    "s3OutputDataConfig": {"s3Uri": f"s3://{s3_bucket}/bifrost-batch-output/"}
+                    "s3OutputDataConfig": {
+                        "s3Uri": f"s3://{s3_bucket}/bifrost-batch-output/"
+                    }
                 },
                 tags=[
                     {"key": "endpoint", "value": "/v1/chat/completions"},
@@ -1323,14 +1387,18 @@ class TestBedrockIntegration:
             )
 
             assert "jobArn" in response, "Response should contain jobArn"
-            print(f"Success: Created batch job {response['jobArn']} for provider {provider}")
+            print(
+                f"Success: Created batch job {response['jobArn']} for provider {provider}"
+            )
 
         except Exception as e:
             if "not authorized" in str(e).lower() or "access denied" in str(e).lower():
                 pytest.skip(f"Batch API not authorized: {e}")
             raise
 
-    @pytest.mark.parametrize("provider,model", get_cross_provider_params_for_scenario("batch_list"))
+    @pytest.mark.parametrize(
+        "provider,model", get_cross_provider_params_for_scenario("batch_list")
+    )
     def test_17_batch_list(self, test_config, provider, model):
         """Test Case 17: List batch inference jobs
 
@@ -1347,9 +1415,9 @@ class TestBedrockIntegration:
 
         try:
             response = bedrock_client.list_model_invocation_jobs(maxResults=10)
-            assert (
-                "invocationJobSummaries" in response
-            ), "Response should contain invocationJobSummaries"
+            assert "invocationJobSummaries" in response, (
+                "Response should contain invocationJobSummaries"
+            )
 
             # Validate job summary structure if there are any jobs
             if len(response["invocationJobSummaries"]) > 0:
@@ -1426,10 +1494,14 @@ class TestBedrockIntegration:
 
             # Expected fields (present for most jobs)
             if "jobName" in response:
-                assert isinstance(response["jobName"], str), "jobName should be a string"
+                assert isinstance(response["jobName"], str), (
+                    "jobName should be a string"
+                )
 
             if "modelId" in response:
-                assert isinstance(response["modelId"], str), "modelId should be a string"
+                assert isinstance(response["modelId"], str), (
+                    "modelId should be a string"
+                )
 
             if "inputDataConfig" in response:
                 assert "s3InputDataConfig" in response["inputDataConfig"]
@@ -1440,7 +1512,9 @@ class TestBedrockIntegration:
                 assert "s3Uri" in response["outputDataConfig"]["s3OutputDataConfig"]
 
             if "submitTime" in response:
-                assert response["submitTime"] is not None, "submitTime should not be None"
+                assert response["submitTime"] is not None, (
+                    "submitTime should not be None"
+                )
 
             print(
                 f"Success: Retrieved job {response['jobArn']} with status {response['status']} for provider {provider}"
@@ -1521,7 +1595,9 @@ class TestBedrockIntegration:
             # Validate job creation response
             assert "jobArn" in create_response, "Response should contain jobArn"
             assert create_response["jobArn"], "jobArn should not be empty"
-            assert create_response["jobArn"].startswith("arn:"), "jobArn should be a valid ARN"
+            assert create_response["jobArn"].startswith("arn:"), (
+                "jobArn should be a valid ARN"
+            )
 
             print(f"create_response: {create_response}")
 
@@ -1533,14 +1609,18 @@ class TestBedrockIntegration:
             bedrock_client.stop_model_invocation_job(jobIdentifier=job_arn)
 
             # Verify job was cancelled by checking status
-            status_response = bedrock_client.get_model_invocation_job(jobIdentifier=job_arn)
+            status_response = bedrock_client.get_model_invocation_job(
+                jobIdentifier=job_arn
+            )
             assert "status" in status_response, "Status response should contain status"
             assert status_response["status"] in [
                 "Stopping",
                 "Stopped",
                 "Failed",
                 "Completed",
-            ], f"Job status should indicate cancellation in progress or complete: {status_response['status']}"
+            ], (
+                f"Job status should indicate cancellation in progress or complete: {status_response['status']}"
+            )
 
             print(
                 f"Success: Cancelled job {job_arn} with status {status_response['status']} for provider {provider}"
@@ -1612,7 +1692,9 @@ class TestBedrockIntegration:
                     "s3InputDataConfig": {"s3Uri": input_uri, "s3InputFormat": "JSONL"}
                 },
                 outputDataConfig={
-                    "s3OutputDataConfig": {"s3Uri": f"s3://{s3_bucket}/bifrost-batch-e2e-output/"}
+                    "s3OutputDataConfig": {
+                        "s3Uri": f"s3://{s3_bucket}/bifrost-batch-e2e-output/"
+                    }
                 },
                 tags=[
                     {"key": "endpoint", "value": "/v1/chat/completions"},
@@ -1626,16 +1708,20 @@ class TestBedrockIntegration:
             # Step 3: Poll for status (with timeout)
             max_polls = 5  # Quick check, not waiting for completion
             for i in range(max_polls):
-                status_response = bedrock_client.get_model_invocation_job(jobIdentifier=job_arn)
+                status_response = bedrock_client.get_model_invocation_job(
+                    jobIdentifier=job_arn
+                )
                 status = status_response.get("status", "Unknown")
-                print(f"Step 3: Job status ({i+1}/{max_polls}): {status}")
+                print(f"Step 3: Job status ({i + 1}/{max_polls}): {status}")
 
                 if status in ["Completed", "Failed", "Stopped"]:
                     break
 
                 time.sleep(2)
 
-            print(f"Success: End-to-end batch workflow completed for provider {provider}")
+            print(
+                f"Success: End-to-end batch workflow completed for provider {provider}"
+            )
 
         except Exception as e:
             if "not authorized" in str(e).lower() or "access denied" in str(e).lower():
@@ -1666,7 +1752,9 @@ class TestBedrockIntegration:
             messages=[
                 {
                     "role": "user",
-                    "content": [{"text": "What are the key elements of contract formation?"}],
+                    "content": [
+                        {"text": "What are the key elements of contract formation?"}
+                    ],
                 }
             ],
         )
@@ -1684,7 +1772,9 @@ class TestBedrockIntegration:
             messages=[
                 {
                     "role": "user",
-                    "content": [{"text": "Explain the purpose of force majeure clauses."}],
+                    "content": [
+                        {"text": "Explain the purpose of force majeure clauses."}
+                    ],
                 }
             ],
         )
@@ -1692,9 +1782,9 @@ class TestBedrockIntegration:
         cache_read_tokens = validate_cache_read(response2["usage"], "Second request")
 
         # Validate that cache read tokens are approximately equal to cache write tokens
-        assert (
-            abs(cache_write_tokens - cache_read_tokens) < 100
-        ), f"Cache read tokens ({cache_read_tokens}) should be close to cache write tokens ({cache_write_tokens})"
+        assert abs(cache_write_tokens - cache_read_tokens) < 100, (
+            f"Cache read tokens ({cache_read_tokens}) should be close to cache write tokens ({cache_write_tokens})"
+        )
 
         print(
             f"✓ System caching validated - Cache created: {cache_write_tokens} tokens, "
@@ -1721,7 +1811,9 @@ class TestBedrockIntegration:
                     "content": [
                         {"text": "Here is a large legal document to analyze:"},
                         {"text": PROMPT_CACHING_LARGE_CONTEXT},
-                        {"cachePoint": {"type": "default"}},  # Cache all preceding message content
+                        {
+                            "cachePoint": {"type": "default"}
+                        },  # Cache all preceding message content
                         {"text": "What are the main indemnification principles?"},
                     ],
                 }
@@ -1752,9 +1844,9 @@ class TestBedrockIntegration:
         cache_read_tokens = validate_cache_read(response2["usage"], "Second request")
 
         # Validate that cache read tokens are approximately equal to cache write tokens
-        assert (
-            abs(cache_write_tokens - cache_read_tokens) < 100
-        ), f"Cache read tokens ({cache_read_tokens}) should be close to cache write tokens ({cache_write_tokens})"
+        assert abs(cache_write_tokens - cache_read_tokens) < 100, (
+            f"Cache read tokens ({cache_read_tokens}) should be close to cache write tokens ({cache_write_tokens})"
+        )
 
         print(
             f"✓ Messages caching validated - Cache created: {cache_write_tokens} tokens, "
@@ -1786,7 +1878,9 @@ class TestBedrockIntegration:
             )
 
         # Add cache point after all tools
-        bedrock_tools.append({"cachePoint": {"type": "default"}})  # Cache all 12 tool definitions
+        bedrock_tools.append(
+            {"cachePoint": {"type": "default"}}
+        )  # Cache all 12 tool definitions
 
         # First request with tool cache point
         tool_config = {
@@ -1796,7 +1890,9 @@ class TestBedrockIntegration:
         response1 = bedrock_client.converse(
             modelId=format_provider_model(provider, model),
             toolConfig=tool_config,
-            messages=[{"role": "user", "content": [{"text": "What's the weather in Boston?"}]}],
+            messages=[
+                {"role": "user", "content": [{"text": "What's the weather in Boston?"}]}
+            ],
         )
 
         assert response1 is not None
@@ -1814,9 +1910,9 @@ class TestBedrockIntegration:
         cache_read_tokens = validate_cache_read(response2["usage"], "Second request")
 
         # Validate that cache read tokens are approximately equal to cache write tokens
-        assert (
-            abs(cache_write_tokens - cache_read_tokens) < 100
-        ), f"Cache read tokens ({cache_read_tokens}) should be close to cache write tokens ({cache_write_tokens})"
+        assert abs(cache_write_tokens - cache_read_tokens) < 100, (
+            f"Cache read tokens ({cache_read_tokens}) should be close to cache write tokens ({cache_write_tokens})"
+        )
 
         print(
             f"✓ Tools caching validated - Cache created: {cache_write_tokens} tokens, "
@@ -1833,9 +1929,9 @@ def validate_cache_write(usage: Dict[str, Any], operation: str) -> int:
     )
 
     cache_write_tokens = usage.get("cacheWriteInputTokens", 0)
-    assert (
-        cache_write_tokens > 0
-    ), f"{operation} should write to cache (got {cache_write_tokens} tokens)"
+    assert cache_write_tokens > 0, (
+        f"{operation} should write to cache (got {cache_write_tokens} tokens)"
+    )
 
     return cache_write_tokens
 
@@ -1849,9 +1945,9 @@ def validate_cache_read(usage: Dict[str, Any], operation: str) -> int:
     )
 
     cache_read_tokens = usage.get("cacheReadInputTokens", 0)
-    assert (
-        cache_read_tokens > 0
-    ), f"{operation} should read from cache (got {cache_read_tokens} tokens)"
+    assert cache_read_tokens > 0, (
+        f"{operation} should read from cache (got {cache_read_tokens} tokens)"
+    )
 
     return cache_read_tokens
 
@@ -1867,12 +1963,16 @@ class TestBedrockCountTokens:
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for count_tokens scenario")
 
-        print(f"\n=== Testing Count Tokens (Simple Messages) for provider {provider} ===")
+        print(
+            f"\n=== Testing Count Tokens (Simple Messages) for provider {provider} ==="
+        )
 
         # Prepare the count tokens request with simple messages
         input_data = {
             "converse": {
-                "messages": [{"role": "user", "content": [{"text": "Hello, how are you?"}]}]
+                "messages": [
+                    {"role": "user", "content": [{"text": "Hello, how are you?"}]}
+                ]
             }
         }
 
@@ -1884,15 +1984,17 @@ class TestBedrockCountTokens:
         # Validate response structure
         assert response is not None, "Response should not be None"
         assert "inputTokens" in response, "Response should have inputTokens field"
-        assert isinstance(response["inputTokens"], int), "inputTokens should be an integer"
-        assert (
-            response["inputTokens"] > 0
-        ), f"inputTokens should be positive, got {response['inputTokens']}"
+        assert isinstance(response["inputTokens"], int), (
+            "inputTokens should be an integer"
+        )
+        assert response["inputTokens"] > 0, (
+            f"inputTokens should be positive, got {response['inputTokens']}"
+        )
 
         # Simple text should have a reasonable token count (between 3-20 tokens)
-        assert (
-            3 <= response["inputTokens"] <= 20
-        ), f"Simple text should have 3-20 tokens, got {response['inputTokens']}"
+        assert 3 <= response["inputTokens"] <= 20, (
+            f"Simple text should have 3-20 tokens, got {response['inputTokens']}"
+        )
 
         print(f"✓ Simple messages token count: {response['inputTokens']} tokens")
 
@@ -1909,9 +2011,16 @@ class TestBedrockCountTokens:
         # Prepare the count tokens request with system message
         input_data = {
             "converse": {
-                "system": [{"text": "You are a helpful assistant that provides concise answers."}],
+                "system": [
+                    {
+                        "text": "You are a helpful assistant that provides concise answers."
+                    }
+                ],
                 "messages": [
-                    {"role": "user", "content": [{"text": "What is the capital of France?"}]}
+                    {
+                        "role": "user",
+                        "content": [{"text": "What is the capital of France?"}],
+                    }
                 ],
             }
         }
@@ -1924,15 +2033,17 @@ class TestBedrockCountTokens:
         # Validate response structure
         assert response is not None, "Response should not be None"
         assert "inputTokens" in response, "Response should have inputTokens field"
-        assert isinstance(response["inputTokens"], int), "inputTokens should be an integer"
-        assert (
-            response["inputTokens"] > 0
-        ), f"inputTokens should be positive, got {response['inputTokens']}"
+        assert isinstance(response["inputTokens"], int), (
+            "inputTokens should be an integer"
+        )
+        assert response["inputTokens"] > 0, (
+            f"inputTokens should be positive, got {response['inputTokens']}"
+        )
 
         # With system message should have more tokens than simple text
-        assert (
-            response["inputTokens"] > 5
-        ), f"With system message should have >5 tokens, got {response['inputTokens']}"
+        assert response["inputTokens"] > 5, (
+            f"With system message should have >5 tokens, got {response['inputTokens']}"
+        )
 
         print(f"✓ With system message token count: {response['inputTokens']} tokens")
 
@@ -1965,7 +2076,11 @@ class TestBedrockCountTokens:
                 "messages": [
                     {
                         "role": "user",
-                        "content": [{"text": "What's the weather in Boston and what is 25 + 17?"}],
+                        "content": [
+                            {
+                                "text": "What's the weather in Boston and what is 25 + 17?"
+                            }
+                        ],
                     }
                 ],
             }
@@ -1979,15 +2094,17 @@ class TestBedrockCountTokens:
         # Validate response structure
         assert response is not None, "Response should not be None"
         assert "inputTokens" in response, "Response should have inputTokens field"
-        assert isinstance(response["inputTokens"], int), "inputTokens should be an integer"
-        assert (
-            response["inputTokens"] > 0
-        ), f"inputTokens should be positive, got {response['inputTokens']}"
+        assert isinstance(response["inputTokens"], int), (
+            "inputTokens should be an integer"
+        )
+        assert response["inputTokens"] > 0, (
+            f"inputTokens should be positive, got {response['inputTokens']}"
+        )
 
         # With tools should have significantly more tokens
-        assert (
-            response["inputTokens"] > 20
-        ), f"With tools should have >20 tokens, got {response['inputTokens']}"
+        assert response["inputTokens"] > 20, (
+            f"With tools should have >20 tokens, got {response['inputTokens']}"
+        )
 
         print(f"✓ With tools token count: {response['inputTokens']} tokens")
 
@@ -2005,7 +2122,9 @@ class TestBedrockCountTokens:
         long_text = "This is a longer text that should have more tokens. " * 20
 
         input_data = {
-            "converse": {"messages": [{"role": "user", "content": [{"text": long_text}]}]}
+            "converse": {
+                "messages": [{"role": "user", "content": [{"text": long_text}]}]
+            }
         }
 
         # Call the count_tokens method
@@ -2016,17 +2135,21 @@ class TestBedrockCountTokens:
         # Validate response structure
         assert response is not None, "Response should not be None"
         assert "inputTokens" in response, "Response should have inputTokens field"
-        assert isinstance(response["inputTokens"], int), "inputTokens should be an integer"
-        assert (
-            response["inputTokens"] > 50
-        ), f"Long text should have >50 tokens, got {response['inputTokens']}"
+        assert isinstance(response["inputTokens"], int), (
+            "inputTokens should be an integer"
+        )
+        assert response["inputTokens"] > 50, (
+            f"Long text should have >50 tokens, got {response['inputTokens']}"
+        )
 
         print(f"✓ Long text token count: {response['inputTokens']} tokens")
 
     @pytest.mark.parametrize(
         "provider,model", get_cross_provider_params_for_scenario("count_tokens")
     )
-    def test_28_count_tokens_multi_turn_conversation(self, bedrock_client, provider, model):
+    def test_28_count_tokens_multi_turn_conversation(
+        self, bedrock_client, provider, model
+    ):
         """Test Case 28: Count tokens from multi-turn conversation"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for count_tokens scenario")
@@ -2037,8 +2160,14 @@ class TestBedrockCountTokens:
         input_data = {
             "converse": {
                 "messages": [
-                    {"role": "user", "content": [{"text": "What is the capital of France?"}]},
-                    {"role": "assistant", "content": [{"text": "The capital of France is Paris."}]},
+                    {
+                        "role": "user",
+                        "content": [{"text": "What is the capital of France?"}],
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{"text": "The capital of France is Paris."}],
+                    },
                     {"role": "user", "content": [{"text": "What is the population?"}]},
                 ]
             }
@@ -2052,17 +2181,21 @@ class TestBedrockCountTokens:
         # Validate response structure
         assert response is not None, "Response should not be None"
         assert "inputTokens" in response, "Response should have inputTokens field"
-        assert isinstance(response["inputTokens"], int), "inputTokens should be an integer"
-        assert (
-            response["inputTokens"] > 0
-        ), f"inputTokens should be positive, got {response['inputTokens']}"
+        assert isinstance(response["inputTokens"], int), (
+            "inputTokens should be an integer"
+        )
+        assert response["inputTokens"] > 0, (
+            f"inputTokens should be positive, got {response['inputTokens']}"
+        )
 
         # Multi-turn should have more tokens than simple messages
-        assert (
-            response["inputTokens"] > 15
-        ), f"Multi-turn conversation should have >15 tokens, got {response['inputTokens']}"
+        assert response["inputTokens"] > 15, (
+            f"Multi-turn conversation should have >15 tokens, got {response['inputTokens']}"
+        )
 
-        print(f"✓ Multi-turn conversation token count: {response['inputTokens']} tokens")
+        print(
+            f"✓ Multi-turn conversation token count: {response['inputTokens']} tokens"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2073,6 +2206,7 @@ class TestBedrockCountTokens:
 # flat-field for Stability AI) as well as cross-provider model IDs
 # (vertex/..., openai/...) routed through the same invoke endpoint.
 # ---------------------------------------------------------------------------
+
 
 def _assert_invoke_images(response_body: dict, min_images: int = 1) -> None:
     """Assert that an invoke response contains at least min_images base64 images."""
@@ -2086,7 +2220,9 @@ def _assert_invoke_images(response_body: dict, min_images: int = 1) -> None:
         f"Response keys: {list(response_body.keys())}"
     )
     for i, img in enumerate(images):
-        assert isinstance(img, str) and len(img) > 0, f"Image {i} is not a non-empty string"
+        assert isinstance(img, str) and len(img) > 0, (
+            f"Image {i} is not a non-empty string"
+        )
     print(f"  ✓ {len(images)} image(s) returned")
 
 
@@ -2096,7 +2232,9 @@ def _assert_invoke_embedding(response_body: dict) -> None:
     assert len(embedding) > 0, (
         f"Expected 'embedding' array in response, got keys: {list(response_body.keys())}"
     )
-    assert all(isinstance(v, (int, float)) for v in embedding), "Embedding must be numeric"
+    assert all(isinstance(v, (int, float)) for v in embedding), (
+        "Embedding must be numeric"
+    )
     print(f"  ✓ embedding dim={len(embedding)}")
 
 
@@ -2219,11 +2357,13 @@ class TestBedrockInvokeEndpoint:
             _assert_invoke_embedding(out)
         else:
             embeddings = out.get("embeddings")
-            assert isinstance(embeddings, list) and len(embeddings) == len(body["texts"]), (
-                f"Expected {len(body['texts'])} embeddings, got: {out}"
-            )
+            assert isinstance(embeddings, list) and len(embeddings) == len(
+                body["texts"]
+            ), f"Expected {len(body['texts'])} embeddings, got: {out}"
             for i, vector in enumerate(embeddings):
-                assert isinstance(vector, list) and len(vector) > 0, f"Embedding {i} is empty"
+                assert isinstance(vector, list) and len(vector) > 0, (
+                    f"Embedding {i} is empty"
+                )
                 assert all(isinstance(v, (int, float)) for v in vector), (
                     f"Embedding {i} must be numeric"
                 )
@@ -2458,7 +2598,9 @@ class TestBedrockInvokeEndpoint:
         fell through to TextCompletionRequest. Detection must be model-ID-based (contains 'embed')
         and cover all Cohere embedding payload shapes: 'texts', 'inputs', and 'images'.
         """
-        print("\n=== Test 41: Cohere embeddings via invoke (inputs payload, not text completion) ===")
+        print(
+            "\n=== Test 41: Cohere embeddings via invoke (inputs payload, not text completion) ==="
+        )
 
         # Use 'inputs' field instead of 'texts' — this is the payload shape that was misrouted
         body = {
@@ -2511,13 +2653,19 @@ class TestBedrockInvokeEndpoint:
             f"Expected response_type='embeddings_by_type', got: {out.get('response_type')}"
         )
         embeddings = out.get("embeddings", {})
-        assert "float" in embeddings, f"Expected 'float' key in embeddings, got: {list(embeddings.keys())}"
+        assert "float" in embeddings, (
+            f"Expected 'float' key in embeddings, got: {list(embeddings.keys())}"
+        )
         float_vecs = embeddings["float"]
         assert isinstance(float_vecs, list) and len(float_vecs) == 1, (
             f"Expected 1 float vector, got: {float_vecs}"
         )
-        assert isinstance(float_vecs[0], list) and len(float_vecs[0]) > 0, "Float vector is empty"
-        assert all(isinstance(v, float) for v in float_vecs[0]), "Float vector must contain floats"
+        assert isinstance(float_vecs[0], list) and len(float_vecs[0]) > 0, (
+            "Float vector is empty"
+        )
+        assert all(isinstance(v, float) for v in float_vecs[0]), (
+            "Float vector must contain floats"
+        )
         print(f"  ✓ float embedding dim={len(float_vecs[0])}")
 
     # ------------------------------------------------------------------ #
@@ -2558,7 +2706,9 @@ class TestBedrockInvokeEndpoint:
         assert isinstance(int8_vecs, list) and len(int8_vecs) == 1, (
             f"Expected 1 int8 vector, got: {int8_vecs}"
         )
-        assert isinstance(int8_vecs[0], list) and len(int8_vecs[0]) > 0, "int8 vector is empty"
+        assert isinstance(int8_vecs[0], list) and len(int8_vecs[0]) > 0, (
+            "int8 vector is empty"
+        )
         assert all(isinstance(v, int) and -128 <= v <= 127 for v in int8_vecs[0]), (
             "int8 vector values must be integers in [-128, 127]"
         )
@@ -2601,7 +2751,9 @@ class TestBedrockInvokeEndpoint:
         assert isinstance(uint8_vecs, list) and len(uint8_vecs) == 1, (
             f"Expected 1 uint8 vector, got: {uint8_vecs}"
         )
-        assert isinstance(uint8_vecs[0], list) and len(uint8_vecs[0]) > 0, "uint8 vector is empty"
+        assert isinstance(uint8_vecs[0], list) and len(uint8_vecs[0]) > 0, (
+            "uint8 vector is empty"
+        )
         assert all(isinstance(v, int) and 0 <= v <= 255 for v in uint8_vecs[0]), (
             "uint8 vector values must be integers in [0, 255]"
         )
@@ -2647,8 +2799,12 @@ class TestBedrockInvokeEndpoint:
                 f"Expected {len(texts)} {enc_type} vectors, got {len(vecs)}"
             )
             for i, vec in enumerate(vecs):
-                assert isinstance(vec, list) and len(vec) > 0, f"{enc_type} vector {i} is empty"
-        print(f"  ✓ float dim={len(embeddings['float'][0])}, int8 dim={len(embeddings['int8'][0])}")
+                assert isinstance(vec, list) and len(vec) > 0, (
+                    f"{enc_type} vector {i} is empty"
+                )
+        print(
+            f"  ✓ float dim={len(embeddings['float'][0])}, int8 dim={len(embeddings['int8'][0])}"
+        )
 
     # ------------------------------------------------------------------ #
     # 46. Anthropic claude — messages path via invoke                      #
@@ -2703,7 +2859,9 @@ class TestBedrockInvokeEndpoint:
         assert out.get("stop_reason") in ("end_turn", "max_tokens"), (
             f"Unexpected stop_reason: {out.get('stop_reason')}"
         )
-        print(f"  ✓ stop_reason={out['stop_reason']!r}, text={text_block['text'][:60]!r}")
+        print(
+            f"  ✓ stop_reason={out['stop_reason']!r}, text={text_block['text'][:60]!r}"
+        )
 
     # ------------------------------------------------------------------ #
     # 47. Nova — messages path via invoke                                  #
@@ -2747,7 +2905,9 @@ class TestBedrockInvokeEndpoint:
             f"Request was misrouted to text-completion path — got keys: {list(out.keys())}"
         )
         # Must be Converse-compatible format
-        assert "output" in out, f"Expected 'output' in response, got: {list(out.keys())}"
+        assert "output" in out, (
+            f"Expected 'output' in response, got: {list(out.keys())}"
+        )
         msg = out["output"].get("message", {})
         assert msg.get("role") == "assistant", (
             f"Expected role='assistant', got: {msg.get('role')}"
@@ -2814,7 +2974,9 @@ class TestBedrockInvokeEndpoint:
         assert choices[0].get("finish_reason") in ("stop", "length"), (
             f"Unexpected finish_reason: {choices[0].get('finish_reason')}"
         )
-        print(f"  ✓ finish_reason={choices[0]['finish_reason']!r}, content={msg['content'][:60]!r}")
+        print(
+            f"  ✓ finish_reason={choices[0]['finish_reason']!r}, content={msg['content'][:60]!r}"
+        )
 
     # ------------------------------------------------------------------ #
     # 49. Anthropic claude — messages streaming via invoke-stream          #
@@ -2827,7 +2989,9 @@ class TestBedrockInvokeEndpoint:
         invoke-with-response-stream returns Anthropic SSE events (message_start,
         content_block_delta, message_delta, message_stop) wrapped in InvokeModelRawChunk bytes.
         """
-        print("\n=== Test 49: Anthropic claude via invoke-with-response-stream (messages path) ===")
+        print(
+            "\n=== Test 49: Anthropic claude via invoke-with-response-stream (messages path) ==="
+        )
 
         body = {
             "messages": [
@@ -2847,7 +3011,9 @@ class TestBedrockInvokeEndpoint:
                 body=json.dumps(body),
             )
         except AttributeError:
-            pytest.skip("invoke_model_with_response_stream not available in this boto3 version")
+            pytest.skip(
+                "invoke_model_with_response_stream not available in this boto3 version"
+            )
         except Exception as e:
             pytest.fail(f"invoke_model_with_response_stream failed: {e}")
 

@@ -175,7 +175,6 @@ from .utils.common import (
     # Citation utilities
     assert_valid_openai_annotation,
     # WebSocket utilities
-    WS_RESPONSES_SIMPLE_INPUT,
     get_realtime_test_model,
     get_ws_base_url,
     run_openai_base_url_client_secret_request,
@@ -348,7 +347,8 @@ class TestOpenAIIntegration:
     """Test suite for OpenAI integration with cross-provider support"""
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("simple_chat")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("simple_chat"),
     )
     def test_01_simple_chat(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -382,10 +382,14 @@ class TestOpenAIIntegration:
         assert_valid_chat_response(response)
         content = get_content_string(response.choices[0].message.content)
         # Should mention population or numbers since we asked about Paris population
-        assert any(word in content for word in ["population", "million", "people", "inhabitants"])
+        assert any(
+            word in content
+            for word in ["population", "million", "people", "inhabitants"]
+        )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("tool_calls")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("tool_calls"),
     )
     def test_03_single_tool_call(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -439,7 +443,9 @@ class TestOpenAIIntegration:
         """Test Case 5: Complete tool calling flow with responses"""
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
         # Initial request
-        messages = [{"role": "user", "content": "What's the weather in Boston in fahrenheit?"}]
+        messages = [
+            {"role": "user", "content": "What's the weather in Boston in fahrenheit?"}
+        ]
 
         response = client.chat.completions.create(
             model=format_provider_model(provider, model),
@@ -455,7 +461,9 @@ class TestOpenAIIntegration:
 
         # Add tool response
         tool_calls = extract_openai_tool_calls(response)
-        tool_response = mock_tool_response(tool_calls[0]["name"], tool_calls[0]["arguments"])
+        tool_response = mock_tool_response(
+            tool_calls[0]["name"], tool_calls[0]["arguments"]
+        )
 
         messages.append(
             {
@@ -467,7 +475,9 @@ class TestOpenAIIntegration:
 
         # Get final response
         final_response = client.chat.completions.create(
-            model=format_provider_model(provider, model), messages=messages, max_tokens=150
+            model=format_provider_model(provider, model),
+            messages=messages,
+            max_tokens=150,
         )
 
         assert_valid_chat_response(final_response)
@@ -479,7 +489,9 @@ class TestOpenAIIntegration:
         "provider,model,vk_enabled",
         get_cross_provider_params_with_vk_for_scenario("automatic_function_calling"),
     )
-    def test_06_automatic_function_calling(self, test_config, provider, model, vk_enabled):
+    def test_06_automatic_function_calling(
+        self, test_config, provider, model, vk_enabled
+    ):
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
         """Test Case 6: Automatic function calling (tool_choice='auto')"""
@@ -498,7 +510,8 @@ class TestOpenAIIntegration:
         assert tool_calls[0]["name"] == "calculate"
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("image_url")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("image_url"),
     )
     def test_07_image_url(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -514,7 +527,8 @@ class TestOpenAIIntegration:
         assert_valid_image_response(response)
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("image_base64")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("image_base64"),
     )
     def test_08_image_base64(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -547,9 +561,9 @@ class TestOpenAIIntegration:
         assert_valid_image_response(response)
         content = get_content_string(response.choices[0].message.content)
         # Should mention comparison or differences (flexible matching)
-        assert any(
-            word in content for word in COMPARISON_KEYWORDS
-        ), f"Response should contain comparison keywords. Got content: {content}"
+        assert any(word in content for word in COMPARISON_KEYWORDS), (
+            f"Response should contain comparison keywords. Got content: {content}"
+        )
 
     @skip_if_no_api_key("openai")
     def test_10_complex_end2end(self, openai_client, test_config):
@@ -639,7 +653,9 @@ class TestOpenAIIntegration:
         # Test 3: Temperature and top_p parameters
         response3 = openai_client.chat.completions.create(
             model=get_model("openai", "chat"),
-            messages=[{"role": "user", "content": "Tell me a creative story in one sentence."}],
+            messages=[
+                {"role": "user", "content": "Tell me a creative story in one sentence."}
+            ],
             temperature=0.9,
             top_p=0.9,
             max_tokens=100,
@@ -664,7 +680,8 @@ class TestOpenAIIntegration:
         assert_error_propagation(error, "openai")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("streaming")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("streaming"),
     )
     def test_13_streaming(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -707,8 +724,12 @@ class TestOpenAIIntegration:
                 )
 
                 # Validate tool streaming results
-                assert chunk_count_tools > 0, "Should receive at least one chunk with tools"
-                assert tool_calls_detected_tools, "Should detect tool calls in streaming response"
+                assert chunk_count_tools > 0, (
+                    "Should receive at least one chunk with tools"
+                )
+                assert tool_calls_detected_tools, (
+                    "Should detect tool calls in streaming response"
+                )
 
     @skip_if_no_api_key("openai")
     def test_14_speech_synthesis(self, openai_client, test_config):
@@ -736,7 +757,9 @@ class TestOpenAIIntegration:
         assert_valid_speech_response(audio_content2, expected_audio_size_min=500)
 
         # Verify that different voices produce different audio
-        assert audio_content != audio_content2, "Different voices should produce different audio"
+        assert audio_content != audio_content2, (
+            "Different voices should produce different audio"
+        )
 
     @skip_if_no_api_key("openai")
     def test_15_transcription_audio(self, openai_client, test_config):
@@ -884,35 +907,32 @@ class TestOpenAIIntegration:
         # Test with invalid audio data
         invalid_audio = b"This is not audio data"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             openai_client.audio.transcriptions.create(
                 model=get_model("openai", "transcription"),
                 file=("invalid.wav", invalid_audio, "audio/wav"),
             )
 
-        error = exc_info.value
         # Should get an error for invalid audio format
 
         # Test with invalid model
         valid_audio = generate_test_audio()
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             openai_client.audio.transcriptions.create(
                 model="invalid-transcription-model",
                 file=("test.wav", valid_audio, "audio/wav"),
             )
 
-        error = exc_info.value
         # Should get an error for invalid model
 
         # Test with unsupported file format (if applicable)
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             openai_client.audio.transcriptions.create(
                 model=get_model("openai", "transcription"),
                 file=("test.txt", b"text file content", "text/plain"),
             )
 
-        error = exc_info.value
         # Should get an error for unsupported file type
 
     @skip_if_no_api_key("openai")
@@ -938,9 +958,9 @@ class TestOpenAIIntegration:
 
         # Verify that different voices produce different sized outputs (generally)
         sizes = [size for _, size in voices_tested]
-        assert len(set(sizes)) > 1 or all(
-            s > 1000 for s in sizes
-        ), "Different voices should produce varying audio outputs"
+        assert len(set(sizes)) > 1 or all(s > 1000 for s in sizes), (
+            "Different voices should produce varying audio outputs"
+        )
 
         # Test different response formats
         formats_to_test = ["mp3", "wav", "opus"]
@@ -967,7 +987,8 @@ class TestOpenAIIntegration:
         assert "mp3" in format_results, "MP3 format should be supported"
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("embeddings")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("embeddings"),
     )
     def test_21_single_text_embedding(self, test_config, provider, model, vk_enabled):
         """Test Case 21: Single text embedding generation"""
@@ -983,13 +1004,16 @@ class TestOpenAIIntegration:
         # Verify response structure
         assert len(response.data) == 1, "Should have exactly one embedding"
         assert response.data[0].index == 0, "First embedding should have index 0"
-        assert response.data[0].object == "embedding", "Object type should be 'embedding'"
+        assert response.data[0].object == "embedding", (
+            "Object type should be 'embedding'"
+        )
 
         # Verify model in response
         assert response.model is not None, "Response should include model name"
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("embeddings")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("embeddings"),
     )
     def test_22_batch_text_embeddings(self, test_config, provider, model, vk_enabled):
         """Test Case 22: Batch text embedding generation"""
@@ -1001,19 +1025,24 @@ class TestOpenAIIntegration:
         )
 
         expected_count = len(EMBEDDINGS_MULTIPLE_TEXTS)
-        assert_valid_embeddings_batch_response(response, expected_count, expected_dimensions=1536)
+        assert_valid_embeddings_batch_response(
+            response, expected_count, expected_dimensions=1536
+        )
 
         # Verify each embedding has correct index
         for i, embedding_obj in enumerate(response.data):
             assert embedding_obj.index == i, f"Embedding {i} should have index {i}"
-            assert (
-                embedding_obj.object == "embedding"
-            ), f"Embedding {i} should have object type 'embedding'"
+            assert embedding_obj.object == "embedding", (
+                f"Embedding {i} should have object type 'embedding'"
+            )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("embeddings")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("embeddings"),
     )
-    def test_23_embedding_similarity_analysis(self, test_config, provider, model, vk_enabled):
+    def test_23_embedding_similarity_analysis(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 23: Embedding similarity analysis with similar texts"""
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
         response = client.embeddings.create(
@@ -1034,20 +1063,23 @@ class TestOpenAIIntegration:
         similarity_2_3 = calculate_cosine_similarity(embeddings[1], embeddings[2])
 
         # Similar texts should have high similarity (> 0.6)
-        assert (
-            similarity_1_2 > 0.6
-        ), f"Similar texts should have high similarity, got {similarity_1_2:.4f}"
-        assert (
-            similarity_1_3 > 0.6
-        ), f"Similar texts should have high similarity, got {similarity_1_3:.4f}"
-        assert (
-            similarity_2_3 > 0.6
-        ), f"Similar texts should have high similarity, got {similarity_2_3:.4f}"
+        assert similarity_1_2 > 0.6, (
+            f"Similar texts should have high similarity, got {similarity_1_2:.4f}"
+        )
+        assert similarity_1_3 > 0.6, (
+            f"Similar texts should have high similarity, got {similarity_1_3:.4f}"
+        )
+        assert similarity_2_3 > 0.6, (
+            f"Similar texts should have high similarity, got {similarity_2_3:.4f}"
+        )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("embeddings")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("embeddings"),
     )
-    def test_24_embedding_dissimilarity_analysis(self, test_config, provider, model, vk_enabled):
+    def test_24_embedding_dissimilarity_analysis(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 24: Embedding dissimilarity analysis with different texts"""
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
         response = client.embeddings.create(
@@ -1064,24 +1096,28 @@ class TestOpenAIIntegration:
 
         # Test dissimilarity between different topic embeddings
         # Weather vs Programming
-        weather_prog_similarity = calculate_cosine_similarity(embeddings[0], embeddings[1])
+        weather_prog_similarity = calculate_cosine_similarity(
+            embeddings[0], embeddings[1]
+        )
         # Weather vs Stock Market
-        weather_stock_similarity = calculate_cosine_similarity(embeddings[0], embeddings[2])
+        weather_stock_similarity = calculate_cosine_similarity(
+            embeddings[0], embeddings[2]
+        )
         # Programming vs Machine Learning (should be more similar)
         prog_ml_similarity = calculate_cosine_similarity(embeddings[1], embeddings[3])
 
         # Different topics should have lower similarity
-        assert (
-            weather_prog_similarity < 0.8
-        ), f"Different topics should have lower similarity, got {weather_prog_similarity:.4f}"
-        assert (
-            weather_stock_similarity < 0.8
-        ), f"Different topics should have lower similarity, got {weather_stock_similarity:.4f}"
+        assert weather_prog_similarity < 0.8, (
+            f"Different topics should have lower similarity, got {weather_prog_similarity:.4f}"
+        )
+        assert weather_stock_similarity < 0.8, (
+            f"Different topics should have lower similarity, got {weather_stock_similarity:.4f}"
+        )
 
         # Programming and ML should be more similar than completely different topics
-        assert (
-            prog_ml_similarity > weather_prog_similarity
-        ), "Related tech topics should be more similar than unrelated topics"
+        assert prog_ml_similarity > weather_prog_similarity, (
+            "Related tech topics should be more similar than unrelated topics"
+        )
 
     @skip_if_no_api_key("openai")
     def test_25_embedding_different_models(self, openai_client, test_config):
@@ -1106,16 +1142,17 @@ class TestOpenAIIntegration:
             embedding_large = response_large.data[0].embedding
 
             # They should have different dimensions
-            assert len(embedding_small) != len(
-                embedding_large
-            ), "Different models should produce different dimension embeddings"
+            assert len(embedding_small) != len(embedding_large), (
+                "Different models should produce different dimension embeddings"
+            )
 
         except Exception as e:
             # If text-embedding-3-large is not available, just log it
             print(f"text-embedding-3-large not available: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("embeddings")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("embeddings"),
     )
     def test_26_embedding_long_text(self, test_config, provider, model, vk_enabled):
         """Test Case 26: Embedding generation with longer text"""
@@ -1129,9 +1166,17 @@ class TestOpenAIIntegration:
         assert_valid_embedding_response(response, expected_dimensions=1536)
 
         # Verify token usage is reported for longer text
-        if provider not in {"gemini", "bedrock", "openai"}:  # these providers may not return usage data for embeddings
-            assert response.usage is not None, "Usage should be reported for longer text"
-            assert response.usage.total_tokens > 20, "Longer text should consume more tokens"
+        if provider not in {
+            "gemini",
+            "bedrock",
+            "openai",
+        }:  # these providers may not return usage data for embeddings
+            assert response.usage is not None, (
+                "Usage should be reported for longer text"
+            )
+            assert response.usage.total_tokens > 20, (
+                "Longer text should consume more tokens"
+            )
 
     @skip_if_no_api_key("openai")
     def test_27_embedding_error_handling(self, openai_client, test_config):
@@ -1157,9 +1202,9 @@ class TestOpenAIIntegration:
 
         except Exception as e:
             # Empty input might be rejected, which is acceptable
-            assert (
-                "empty" in str(e).lower() or "invalid" in str(e).lower()
-            ), "Error should mention empty or invalid input"
+            assert "empty" in str(e).lower() or "invalid" in str(e).lower(), (
+                "Error should mention empty or invalid input"
+            )
 
     @skip_if_no_api_key("openai")
     def test_28_embedding_dimensionality_reduction(self, openai_client, test_config):
@@ -1173,7 +1218,9 @@ class TestOpenAIIntegration:
                 dimensions=custom_dimensions,
             )
 
-            assert_valid_embedding_response(response, expected_dimensions=custom_dimensions)
+            assert_valid_embedding_response(
+                response, expected_dimensions=custom_dimensions
+            )
 
             # Compare with default dimensions
             response_default = openai_client.embeddings.create(
@@ -1183,13 +1230,13 @@ class TestOpenAIIntegration:
             embedding_custom = response.data[0].embedding
             embedding_default = response_default.data[0].embedding
 
-            assert (
-                len(embedding_custom) == custom_dimensions
-            ), f"Custom dimensions should be {custom_dimensions}"
+            assert len(embedding_custom) == custom_dimensions, (
+                f"Custom dimensions should be {custom_dimensions}"
+            )
             assert len(embedding_default) == 1536, "Default dimensions should be 1536"
-            assert len(embedding_custom) != len(
-                embedding_default
-            ), "Custom and default dimensions should be different"
+            assert len(embedding_custom) != len(embedding_default), (
+                "Custom and default dimensions should be different"
+            )
 
         except Exception as e:
             # Custom dimensions might not be supported by all models
@@ -1208,9 +1255,9 @@ class TestOpenAIIntegration:
 
             assert_valid_embedding_response(response_float, expected_dimensions=1536)
             embedding_float = response_float.data[0].embedding
-            assert all(
-                isinstance(x, float) for x in embedding_float
-            ), "Float encoding should return float values"
+            assert all(isinstance(x, float) for x in embedding_float), (
+                "Float encoding should return float values"
+            )
 
             # Test with base64 encoding if supported
             try:
@@ -1221,9 +1268,9 @@ class TestOpenAIIntegration:
                 )
 
                 # Base64 encoding returns string data
-                assert (
-                    response_base64.data[0].embedding is not None
-                ), "Base64 encoding should return data"
+                assert response_base64.data[0].embedding is not None, (
+                    "Base64 encoding should return data"
+                )
 
             except Exception as base64_error:
                 print(f"Base64 encoding not supported: {base64_error}")
@@ -1241,8 +1288,12 @@ class TestOpenAIIntegration:
         )
 
         assert_valid_embedding_response(response_single)
-        assert response_single.usage is not None, "Single embedding should have usage data"
-        assert response_single.usage.total_tokens > 0, "Single embedding should consume tokens"
+        assert response_single.usage is not None, (
+            "Single embedding should have usage data"
+        )
+        assert response_single.usage.total_tokens > 0, (
+            "Single embedding should consume tokens"
+        )
         single_tokens = response_single.usage.total_tokens
 
         # Batch embedding
@@ -1250,24 +1301,30 @@ class TestOpenAIIntegration:
             model=get_model("openai", "embeddings"), input=EMBEDDINGS_MULTIPLE_TEXTS
         )
 
-        assert_valid_embeddings_batch_response(response_batch, len(EMBEDDINGS_MULTIPLE_TEXTS))
-        assert response_batch.usage is not None, "Batch embedding should have usage data"
-        assert response_batch.usage.total_tokens > 0, "Batch embedding should consume tokens"
+        assert_valid_embeddings_batch_response(
+            response_batch, len(EMBEDDINGS_MULTIPLE_TEXTS)
+        )
+        assert response_batch.usage is not None, (
+            "Batch embedding should have usage data"
+        )
+        assert response_batch.usage.total_tokens > 0, (
+            "Batch embedding should consume tokens"
+        )
         batch_tokens = response_batch.usage.total_tokens
 
         # Batch should consume more tokens than single
-        assert (
-            batch_tokens > single_tokens
-        ), f"Batch embedding ({batch_tokens} tokens) should consume more than single ({single_tokens} tokens)"
+        assert batch_tokens > single_tokens, (
+            f"Batch embedding ({batch_tokens} tokens) should consume more than single ({single_tokens} tokens)"
+        )
 
         # Verify proportional token usage
         texts_ratio = len(EMBEDDINGS_MULTIPLE_TEXTS)
         token_ratio = batch_tokens / single_tokens
 
         # Token ratio should be roughly proportional to text count (allowing for some variance)
-        assert (
-            0.5 * texts_ratio <= token_ratio <= 2.0 * texts_ratio
-        ), f"Token usage ratio ({token_ratio:.2f}) should be roughly proportional to text count ({texts_ratio})"
+        assert 0.5 * texts_ratio <= token_ratio <= 2.0 * texts_ratio, (
+            f"Token usage ratio ({token_ratio:.2f}) should be roughly proportional to text count ({texts_ratio})"
+        )
 
     # =========================================================================
     # IMAGE GENERATION TEST CASES
@@ -1277,7 +1334,9 @@ class TestOpenAIIntegration:
         "provider,model,vk_enabled",
         get_cross_provider_params_with_vk_for_scenario("image_generation"),
     )
-    def test_52a_image_generation_simple(self, test_config, provider, model, vk_enabled):
+    def test_52a_image_generation_simple(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 52a: Simple image generation with basic prompt"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
@@ -1310,11 +1369,15 @@ class TestOpenAIIntegration:
         "provider,model,vk_enabled",
         get_cross_provider_params_with_vk_for_scenario("image_generation"),
     )
-    def test_52b_image_generation_multiple(self, test_config, provider, model, vk_enabled):
+    def test_52b_image_generation_multiple(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 52b: Generate multiple images at once"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
-        if provider not in ["openai", "azure", "xai"] and model not in ["imagen-4.0-generate-001"]:
+        if provider not in ["openai", "azure", "xai"] and model not in [
+            "imagen-4.0-generate-001"
+        ]:
             pytest.skip(
                 "Multiple image generation is only supported by OpenAI, Azure, XAI, or Imagen models"
             )
@@ -1339,7 +1402,9 @@ class TestOpenAIIntegration:
         "provider,model,vk_enabled",
         get_cross_provider_params_with_vk_for_scenario("image_generation"),
     )
-    def test_52c_image_generation_quality(self, test_config, provider, model, vk_enabled):
+    def test_52c_image_generation_quality(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 52c: Image generation with quality parameter"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
@@ -1371,7 +1436,9 @@ class TestOpenAIIntegration:
         "provider,model,vk_enabled",
         get_cross_provider_params_with_vk_for_scenario("image_generation"),
     )
-    def test_52d_image_generation_different_sizes(self, test_config, provider, model, vk_enabled):
+    def test_52d_image_generation_different_sizes(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 52d: Image generation with different sizes"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
@@ -1396,7 +1463,8 @@ class TestOpenAIIntegration:
     # =========================================================================
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("image_edit")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("image_edit"),
     )
     def test_53a_image_edit_simple(self, test_config, provider, model, vk_enabled):
         """Test Case 53a: Simple image edit with inpainting"""
@@ -1405,7 +1473,9 @@ class TestOpenAIIntegration:
 
         # Bedrock requires type field (inpainting/outpainting) which OpenAI SDK doesn't support
         if provider == "bedrock":
-            pytest.skip("Bedrock requires type field which is not supported by OpenAI SDK")
+            pytest.skip(
+                "Bedrock requires type field which is not supported by OpenAI SDK"
+            )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -1433,7 +1503,8 @@ class TestOpenAIIntegration:
         assert len(response.data) == 1, f"Expected 1 image, got {len(response.data)}"
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("image_edit")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("image_edit"),
     )
     def test_53b_image_edit_no_mask(self, test_config, provider, model, vk_enabled):
         """Test Case 53b: Image edit without mask (outpainting/general edit)"""
@@ -1461,7 +1532,8 @@ class TestOpenAIIntegration:
         assert_valid_image_edit_response(response, "openai")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("image_edit")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("image_edit"),
     )
     def test_53c_image_edit_quality(self, test_config, provider, model, vk_enabled):
         """Test Case 53c: Image edit with quality parameter"""
@@ -1469,7 +1541,9 @@ class TestOpenAIIntegration:
             pytest.skip("No providers configured for this scenario")
         # Bedrock requires type field (inpainting/outpainting) which OpenAI SDK doesn't support
         if provider == "bedrock":
-            pytest.skip("Bedrock requires type field which is not supported by OpenAI SDK")
+            pytest.skip(
+                "Bedrock requires type field which is not supported by OpenAI SDK"
+            )
         if provider != "openai" or model not in [
             "gpt-image-1",
             "gpt-image-1.5",
@@ -1497,16 +1571,21 @@ class TestOpenAIIntegration:
         assert_valid_image_edit_response(response, "openai")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("image_edit")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("image_edit"),
     )
-    def test_53d_image_edit_different_sizes(self, test_config, provider, model, vk_enabled):
+    def test_53d_image_edit_different_sizes(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 53d: Image edit with different output sizes"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
 
         # Bedrock requires type field (inpainting/outpainting) which OpenAI SDK doesn't support
         if provider == "bedrock":
-            pytest.skip("Bedrock requires type field which is not supported by OpenAI SDK")
+            pytest.skip(
+                "Bedrock requires type field which is not supported by OpenAI SDK"
+            )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -1556,7 +1635,12 @@ class TestOpenAIIntegration:
         assert video is not None
         assert getattr(video, "id", None), "Video create should return a video id"
         assert getattr(video, "object", None) in {"video", "video.task"}
-        assert getattr(video, "status", None) in {"queued", "in_progress", "completed", "failed"}
+        assert getattr(video, "status", None) in {
+            "queued",
+            "in_progress",
+            "completed",
+            "failed",
+        }
         assert getattr(video, "model", None) is not None
 
         _safe_cleanup_video(client, video.id, provider)
@@ -1623,9 +1707,9 @@ class TestOpenAIIntegration:
 
                 time.sleep(2)
 
-            assert (
-                found_in_list
-            ), f"Created video {video.id} should be present in videos.list() response"
+            assert found_in_list, (
+                f"Created video {video.id} should be present in videos.list() response"
+            )
         finally:
             _safe_cleanup_video(client, video.id, "openai")
 
@@ -1650,9 +1734,9 @@ class TestOpenAIIntegration:
 
         try:
             terminal_video = _wait_for_video_terminal_status(client, video.id)
-            assert (
-                getattr(terminal_video, "status", None) == "completed"
-            ), f"Video should complete before download. Status: {getattr(terminal_video, 'status', None)}"
+            assert getattr(terminal_video, "status", None) == "completed", (
+                f"Video should complete before download. Status: {getattr(terminal_video, 'status', None)}"
+            )
 
             response = client.videos.download_content(video_id=video.id)
             assert response is not None
@@ -1670,7 +1754,8 @@ class TestOpenAIIntegration:
             if hasattr(response, "headers") and response.headers:
                 content_type = response.headers.get("content-type", "").lower()
                 assert (
-                    "video" in content_type or "application/octet-stream" in content_type
+                    "video" in content_type
+                    or "application/octet-stream" in content_type
                 ), f"Unexpected content-type: {content_type}"
         except Exception as e:
             print("error: ", e)
@@ -1742,7 +1827,8 @@ class TestOpenAIIntegration:
                 _safe_cleanup_video(client, remixed.id, "openai")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_input")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_input"),
     )
     def test_chat_completion_with_file(self, test_config, provider, model, vk_enabled):
         """Test chat completion with PDF file input"""
@@ -1779,16 +1865,17 @@ class TestOpenAIIntegration:
 
         # Should mention document/file content (testingpdf contains "hello world")
         keywords = ["hello", "world", "testing", "pdf", "file"]
-        assert any(
-            keyword in content_lower for keyword in keywords
-        ), f"Response should describe the document content. Got: {content}"
+        assert any(keyword in content_lower for keyword in keywords), (
+            f"Response should describe the document content. Got: {content}"
+        )
 
     # =========================================================================
     # RESPONSES API TEST CASES
     # =========================================================================
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("responses")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("responses"),
     )
     def test_32_responses_simple_text(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -1826,18 +1913,21 @@ class TestOpenAIIntegration:
             "nasa",
             "satellite",
         ]
-        assert any(
-            keyword in content_lower for keyword in keywords
-        ), f"Response should contain space exploration related content. Got: {content}"
+        assert any(keyword in content_lower for keyword in keywords), (
+            f"Response should contain space exploration related content. Got: {content}"
+        )
 
         # Verify usage information
         if hasattr(response, "usage"):
             assert response.usage.total_tokens > 0, "Should report token usage"
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("responses")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("responses"),
     )
-    def test_33_responses_with_system_message(self, test_config, provider, model, vk_enabled):
+    def test_33_responses_with_system_message(
+        self, test_config, provider, model, vk_enabled
+    ):
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
         """Test Case 33: Responses API with system message"""
@@ -1865,9 +1955,9 @@ class TestOpenAIIntegration:
         # Should mention Mars since system message says we're an astronomy expert
         content_lower = content.lower()
         mars_keywords = ["mars", "water", "planet", "discovery", "rover"]
-        assert any(
-            keyword in content_lower for keyword in mars_keywords
-        ), f"Response should contain Mars-related content from astronomy expert. Got: {content}"
+        assert any(keyword in content_lower for keyword in mars_keywords), (
+            f"Response should contain Mars-related content from astronomy expert. Got: {content}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
@@ -1913,12 +2003,13 @@ class TestOpenAIIntegration:
             "landscape",
             "boardwalk",
         ]
-        assert any(
-            keyword in content_lower for keyword in image_keywords
-        ), f"Response should describe the image. Got: {content}"
+        assert any(keyword in content_lower for keyword in image_keywords), (
+            f"Response should describe the image. Got: {content}"
+        )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_input")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_input"),
     )
     def test_responses_with_file(self, test_config, provider, model, vk_enabled):
         """Test Responses API with base64-encoded PDF file"""
@@ -1964,12 +2055,13 @@ class TestOpenAIIntegration:
         # Check for document/file content (testingpdf contains "hello world")
         content_lower = content.lower()
         keywords = ["hello", "world", "testing", "pdf", "file"]
-        assert any(
-            keyword in content_lower for keyword in keywords
-        ), f"Response should describe the document content. Got: {content}"
+        assert any(keyword in content_lower for keyword in keywords), (
+            f"Response should describe the document content. Got: {content}"
+        )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("responses")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("responses"),
     )
     def test_35_responses_with_tools(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -2005,9 +2097,9 @@ class TestOpenAIIntegration:
 
         # Validate function call structure
         assert hasattr(function_call_message, "name"), "Function call should have name"
-        assert (
-            function_call_message.name == "get_weather"
-        ), f"Function call should be 'get_weather', got {function_call_message.name}"
+        assert function_call_message.name == "get_weather", (
+            f"Function call should be 'get_weather', got {function_call_message.name}"
+        )
 
         # Check arguments if present
         if hasattr(function_call_message, "arguments"):
@@ -2019,12 +2111,13 @@ class TestOpenAIIntegration:
 
             assert "location" in args, "Function call should have location argument"
             location_lower = str(args["location"]).lower()
-            assert (
-                "boston" in location_lower
-            ), f"Location should mention Boston, got {args['location']}"
+            assert "boston" in location_lower, (
+                f"Location should mention Boston, got {args['location']}"
+            )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("responses")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("responses"),
     )
     def test_36_responses_streaming(self, test_config, provider, model, vk_enabled):
         if provider == "_no_providers_" or model == "_no_model_":
@@ -2053,15 +2146,17 @@ class TestOpenAIIntegration:
         if provider == "openai":
             assert "response.created" in event_types or any(
                 "created" in evt for evt in event_types
-            ), f"Should receive response.created event. Got events: {list(event_types.keys())}"
+            ), (
+                f"Should receive response.created event. Got events: {list(event_types.keys())}"
+            )
 
         # Check for content events
         has_content_events = any(
             "delta" in evt or "text" in evt or "output" in evt for evt in event_types
         )
-        assert (
-            has_content_events
-        ), f"Should receive content-related events. Got events: {list(event_types.keys())}"
+        assert has_content_events, (
+            f"Should receive content-related events. Got events: {list(event_types.keys())}"
+        )
 
         # Check content quality - should be a poem about AI
         content_lower = content.lower()
@@ -2075,17 +2170,22 @@ class TestOpenAIIntegration:
             "data",
             "compute",
         ]
-        assert any(
-            keyword in content_lower for keyword in ai_keywords
-        ), f"Poem should mention AI-related terms. Got: {content}"
+        assert any(keyword in content_lower for keyword in ai_keywords), (
+            f"Poem should mention AI-related terms. Got: {content}"
+        )
 
         # Should have multiple chunks for streaming
-        assert chunk_count > 1, f"Streaming should have multiple chunks, got {chunk_count}"
+        assert chunk_count > 1, (
+            f"Streaming should have multiple chunks, got {chunk_count}"
+        )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("responses")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("responses"),
     )
-    def test_37_responses_streaming_with_tools(self, test_config, provider, model, vk_enabled):
+    def test_37_responses_streaming_with_tools(
+        self, test_config, provider, model, vk_enabled
+    ):
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for this scenario")
         """Test Case 37: Responses API streaming with tools"""
@@ -2125,11 +2225,14 @@ class TestOpenAIIntegration:
 
     @skip_if_no_api_key("openai")
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("thinking")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("thinking"),
     )
-    def test_37a_chat_reasoning_multi_turn_with_continuity(self, test_config, provider, model, vk_enabled):
+    def test_37a_chat_reasoning_multi_turn_with_continuity(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 37a: Multi-turn chat with reasoning continuity via Responses API.
-        
+
         This test verifies:
         1. First turn: Model reasons about a math problem
         2. Second turn: Follow-up question that requires the model to recall its previous reasoning
@@ -2200,7 +2303,9 @@ class TestOpenAIIntegration:
                 "Reasoning item should have encrypted_content for thinking continuity"
             )
 
-            print(f"Turn 1 response ({len(first_turn_content)} chars): {first_turn_content[:200]}...")
+            print(
+                f"Turn 1 response ({len(first_turn_content)} chars): {first_turn_content[:200]}..."
+            )
 
             # Turn 2: Follow-up that requires recalling previous reasoning
             # Build context with previous response output (includes reasoning items)
@@ -2246,25 +2351,46 @@ class TestOpenAIIntegration:
 
             # The response should reference or build upon the previous calculation
             # (checking for time-related keywords that would indicate understanding of the problem)
-            time_keywords = ["pm", "time", "meet", "hour", "minute", "earlier", "1:30", "2:00", "3:00"]
-            keyword_matches = sum(1 for kw in time_keywords if kw.lower() in second_turn_content.lower())
+            time_keywords = [
+                "pm",
+                "time",
+                "meet",
+                "hour",
+                "minute",
+                "earlier",
+                "1:30",
+                "2:00",
+                "3:00",
+            ]
+            keyword_matches = sum(
+                1 for kw in time_keywords if kw.lower() in second_turn_content.lower()
+            )
             assert keyword_matches >= 2, (
                 f"Second turn should reference time/meeting concepts from the problem. "
                 f"Found {keyword_matches} keywords. Content: {second_turn_content[:300]}..."
             )
 
-            print(f"Turn 2 response ({len(second_turn_content)} chars): {second_turn_content[:200]}...")
+            print(
+                f"Turn 2 response ({len(second_turn_content)} chars): {second_turn_content[:200]}..."
+            )
             print("✓ Multi-turn reasoning with continuity verified")
 
         except Exception as e:
             error_str = str(e)
-            if "does not support" in error_str.lower() or "not available" in error_str.lower() or "not supported" in error_str.lower():
-                pytest.skip(f"Reasoning not supported for {provider}/{model}: {error_str}")
+            if (
+                "does not support" in error_str.lower()
+                or "not available" in error_str.lower()
+                or "not supported" in error_str.lower()
+            ):
+                pytest.skip(
+                    f"Reasoning not supported for {provider}/{model}: {error_str}"
+                )
             raise
 
     @skip_if_no_api_key("openai")
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("thinking")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("thinking"),
     )
     def test_38_responses_reasoning(self, test_config, provider, model, vk_enabled):
         """Test Case 38: Responses API with reasoning (gpt-5 model)"""
@@ -2307,17 +2433,25 @@ class TestOpenAIIntegration:
                             if hasattr(block, "text") and block.text:
                                 content += block.text
                             # Check for reasoning content blocks
-                            if hasattr(block, "type") and block.type == "reasoning_text":
+                            if (
+                                hasattr(block, "type")
+                                and block.type == "reasoning_text"
+                            ):
                                 has_reasoning_content = True
 
                 # Check summary field within output messages (reasoning models)
                 if hasattr(message, "summary") and message.summary:
-                    has_reasoning_content = True  # Presence of summary indicates reasoning
+                    has_reasoning_content = (
+                        True  # Presence of summary indicates reasoning
+                    )
                     if isinstance(message.summary, list):
                         for summary_item in message.summary:
                             if hasattr(summary_item, "text") and summary_item.text:
                                 content += " " + summary_item.text
-                            elif isinstance(summary_item, dict) and "text" in summary_item:
+                            elif (
+                                isinstance(summary_item, dict)
+                                and "text" in summary_item
+                            ):
                                 content += " " + summary_item["text"]
                             # Check for summary_text type
                             if (
@@ -2349,7 +2483,9 @@ class TestOpenAIIntegration:
             ]
 
             # Should mention at least some reasoning keywords
-            keyword_matches = sum(1 for keyword in reasoning_keywords if keyword in content_lower)
+            keyword_matches = sum(
+                1 for keyword in reasoning_keywords if keyword in content_lower
+            )
             assert keyword_matches >= 3, (
                 f"Response should contain reasoning about trains problem. "
                 f"Found {keyword_matches} keywords out of {len(reasoning_keywords)}. "
@@ -2369,9 +2505,9 @@ class TestOpenAIIntegration:
             ]
 
             has_steps = any(indicator in content_lower for indicator in step_indicators)
-            assert (
-                has_steps
-            ), f"Response should show step-by-step reasoning. Content: {content[:200]}..."
+            assert has_steps, (
+                f"Response should show step-by-step reasoning. Content: {content[:200]}..."
+            )
 
             # Log if reasoning content was detected
             if has_reasoning_content:
@@ -2395,7 +2531,9 @@ class TestOpenAIIntegration:
             # Just verify basic response works
             error_str = str(e).lower()
             if "reasoning" in error_str or "not supported" in error_str:
-                print(f"Info: Model {model_to_use} may not fully support reasoning parameters")
+                print(
+                    f"Info: Model {model_to_use} may not fully support reasoning parameters"
+                )
 
                 # Fallback: Try without reasoning parameters
                 response = client.responses.create(
@@ -2413,7 +2551,8 @@ class TestOpenAIIntegration:
 
     @skip_if_no_api_key("openai")
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("thinking")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("thinking"),
     )
     def test_38a_responses_reasoning_streaming_with_summary(
         self, test_config, provider, model, vk_enabled
@@ -2441,7 +2580,9 @@ class TestOpenAIIntegration:
 
         # Validate streaming results
         assert chunk_count > 0, "Should receive at least one chunk"
-        assert len(content) > 30, "Should receive substantial content with reasoning and summary"
+        assert len(content) > 30, (
+            "Should receive substantial content with reasoning and summary"
+        )
         assert not tool_calls_detected, "Reasoning test shouldn't have tool calls"
 
         content_lower = content.lower()
@@ -2458,7 +2599,9 @@ class TestOpenAIIntegration:
             "mile",
         ]
 
-        keyword_matches = sum(1 for keyword in reasoning_keywords if keyword in content_lower)
+        keyword_matches = sum(
+            1 for keyword in reasoning_keywords if keyword in content_lower
+        )
         assert keyword_matches >= 3, (
             f"Streaming response should contain reasoning about trains problem. "
             f"Found {keyword_matches} keywords. Content: {content[:200]}..."
@@ -2487,7 +2630,9 @@ class TestOpenAIIntegration:
         )
 
         # Verify presence of calculation or time
-        has_calculation = any(char in content for char in [":", "+", "-", "*", "/", "="]) or any(
+        has_calculation = any(
+            char in content for char in [":", "+", "-", "*", "/", "="]
+        ) or any(
             time_word in content_lower
             for time_word in ["4:00", "5:00", "6:00", "4 pm", "5 pm", "6 pm"]
         )
@@ -2496,14 +2641,20 @@ class TestOpenAIIntegration:
             print("Success: Streaming response contains calculations or time values")
 
         # Check for reasoning-related events
-        has_reasoning_events = any("reasoning" in evt or "summary" in evt for evt in event_types)
+        has_reasoning_events = any(
+            "reasoning" in evt or "summary" in evt for evt in event_types
+        )
         if has_reasoning_events:
             print("Success: Detected reasoning-related events in stream")
 
         # Should have multiple chunks for streaming
-        assert chunk_count > 1, f"Streaming should have multiple chunks, got {chunk_count}"
+        assert chunk_count > 1, (
+            f"Streaming should have multiple chunks, got {chunk_count}"
+        )
 
-        print(f"Success: Reasoning streaming with summary completed ({chunk_count} chunks)")
+        print(
+            f"Success: Reasoning streaming with summary completed ({chunk_count} chunks)"
+        )
 
     # =========================================================================
     # TEXT COMPLETIONS API TEST CASES
@@ -2542,7 +2693,9 @@ class TestOpenAIIntegration:
         )
 
         # Collect streaming content
-        content, chunk_count = collect_text_completion_streaming_content(stream, timeout=300)
+        content, chunk_count = collect_text_completion_streaming_content(
+            stream, timeout=300
+        )
 
         # Validate streaming results
         assert chunk_count > 0, "Should receive at least one chunk"
@@ -2566,12 +2719,14 @@ class TestOpenAIIntegration:
         has_tech = any(keyword in content_lower for keyword in tech_keywords)
         has_lines = "\n" in content  # Haikus have line breaks
 
-        assert (
-            has_tech or has_lines or len(content) > 10
-        ), f"Completion should be haiku-like or about technology. Got: {content}"
+        assert has_tech or has_lines or len(content) > 10, (
+            f"Completion should be haiku-like or about technology. Got: {content}"
+        )
 
         # Should have multiple chunks for streaming
-        assert chunk_count > 1, f"Streaming should have multiple chunks, got {chunk_count}"
+        assert chunk_count > 1, (
+            f"Streaming should have multiple chunks, got {chunk_count}"
+        )
 
         print(f"Success: Streamed haiku ({chunk_count} chunks): {content}")
 
@@ -2602,7 +2757,9 @@ class TestOpenAIIntegration:
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
         # Create JSONL content for batch with provider-specific model
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=2, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=2, provider=provider
+        )
 
         # Upload the file (provider passed via extra_body)
         response = client.files.create(
@@ -2643,7 +2800,9 @@ class TestOpenAIIntegration:
 
             # Check that our uploaded file is in the list
             file_ids = [f.id for f in list_response.data]
-            assert response.id in file_ids, f"Uploaded file {response.id} should be in file list"
+            assert response.id in file_ids, (
+                f"Uploaded file {response.id} should be in file list"
+            )
 
             print(f"Success: Verified file {response.id} exists in file list")
 
@@ -2658,7 +2817,8 @@ class TestOpenAIIntegration:
                 print(f"Warning: Failed to clean up file: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_list")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_list"),
     )
     def test_42_file_list(self, test_config, provider, model, vk_enabled):
         """Test Case 42: List uploaded files"""
@@ -2676,7 +2836,9 @@ class TestOpenAIIntegration:
             pytest.skip("S3 bucket not configured for file tests")
 
         # First upload a file to ensure we have at least one
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=1, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=1, provider=provider
+        )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -2715,21 +2877,24 @@ class TestOpenAIIntegration:
 
             # Check that our uploaded file is in the list
             file_ids = [f.id for f in response.data]
-            assert (
-                uploaded_file.id in file_ids
-            ), f"Uploaded file {uploaded_file.id} should be in file list"
+            assert uploaded_file.id in file_ids, (
+                f"Uploaded file {uploaded_file.id} should be in file list"
+            )
 
             print(f"Success: Listed {len(response.data)} files")
 
         finally:
             # Clean up (provider passed via extra_query)
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_retrieve")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_retrieve"),
     )
     def test_43_file_retrieve(self, test_config, provider, model, vk_enabled):
         """Test Case 43: Retrieve file metadata by ID"""
@@ -2747,7 +2912,9 @@ class TestOpenAIIntegration:
             pytest.skip("S3 bucket not configured for file tests")
 
         # First upload a file
-        jsonl_content = create_batch_jsonl_content(model=model, provider=provider, num_requests=1)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, provider=provider, num_requests=1
+        )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -2768,32 +2935,39 @@ class TestOpenAIIntegration:
 
         try:
             # Retrieve file metadata (provider passed via extra_query)
-            response = client.files.retrieve(uploaded_file.id, extra_query={"provider": provider})
+            response = client.files.retrieve(
+                uploaded_file.id, extra_query={"provider": provider}
+            )
             # Validate response
             assert_valid_file_response(response, expected_purpose="batch")
-            assert (
-                response.id == uploaded_file.id
-            ), f"Retrieved file ID should match: expected {uploaded_file.id}, got {response.id}"
-            assert (
-                response.filename == "test_retrieve.jsonl"
-            ), f"Filename should match: expected 'test_retrieve.jsonl', got {response.filename}"
+            assert response.id == uploaded_file.id, (
+                f"Retrieved file ID should match: expected {uploaded_file.id}, got {response.id}"
+            )
+            assert response.filename == "test_retrieve.jsonl", (
+                f"Filename should match: expected 'test_retrieve.jsonl', got {response.filename}"
+            )
 
             print(f"Success: Retrieved file metadata for {response.id}")
 
         finally:
             # Clean up (provider passed via extra_query)
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_delete")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_delete"),
     )
     def test_44_file_delete(self, test_config, provider, model, vk_enabled):
         """Test Case 44: Delete an uploaded file"""
         # First upload a file
-        jsonl_content = create_batch_jsonl_content(model=model, provider=provider, num_requests=1)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, provider=provider, num_requests=1
+        )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -2822,7 +2996,9 @@ class TestOpenAIIntegration:
         )
 
         # Delete the file (provider passed via extra_query)
-        response = client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+        response = client.files.delete(
+            uploaded_file.id, extra_query={"provider": provider}
+        )
 
         # Validate response
         assert_valid_file_delete_response(response, expected_id=uploaded_file.id)
@@ -2834,7 +3010,8 @@ class TestOpenAIIntegration:
             client.files.retrieve(uploaded_file.id, extra_query={"provider": provider})
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_content")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_content"),
     )
     def test_45_file_content(self, test_config, provider, model, vk_enabled):
         """Test Case 45: Download file content"""
@@ -2855,7 +3032,9 @@ class TestOpenAIIntegration:
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
         # Create and upload a file with known content
-        jsonl_content = create_batch_jsonl_content(model=model, provider=provider, num_requests=2)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, provider=provider, num_requests=2
+        )
 
         uploaded_file = client.files.create(
             file=("test_content.jsonl", jsonl_content.encode(), "application/jsonl"),
@@ -2872,11 +3051,15 @@ class TestOpenAIIntegration:
             },
         )
 
-        print(f"Success: Uploaded file with ID: {uploaded_file.id} for provider {provider}")
+        print(
+            f"Success: Uploaded file with ID: {uploaded_file.id} for provider {provider}"
+        )
 
         try:
             # Download file content (provider passed via extra_query)
-            response = client.files.content(uploaded_file.id, extra_query={"provider": provider})
+            response = client.files.content(
+                uploaded_file.id, extra_query={"provider": provider}
+            )
 
             # Validate content
             assert response is not None, "File content should not be None"
@@ -2902,7 +3085,9 @@ class TestOpenAIIntegration:
         finally:
             # Clean up (provider passed via extra_query)
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
@@ -2966,7 +3151,9 @@ class TestOpenAIIntegration:
                             extra_body={"provider": provider},
                         )
                     except Exception as e:
-                        print(f"Info: Could not cancel batch (may already be processed): {e}")
+                        print(
+                            f"Info: Could not cancel batch (may already be processed): {e}"
+                        )
             return
 
         # File-based batching for other providers (Bedrock, OpenAI)
@@ -2990,7 +3177,11 @@ class TestOpenAIIntegration:
         )
 
         uploaded_file = client.files.create(
-            file=("batch_create_file_test.jsonl", jsonl_content.encode(), "application/jsonl"),
+            file=(
+                "batch_create_file_test.jsonl",
+                jsonl_content.encode(),
+                "application/jsonl",
+            ),
             purpose="batch",
             extra_body={
                 "provider": provider,
@@ -3020,9 +3211,9 @@ class TestOpenAIIntegration:
             )
             # Validate response
             assert_valid_batch_response(batch)
-            assert (
-                batch.input_file_id == uploaded_file.id
-            ), f"Input file ID should match: expected {uploaded_file.id}, got {batch.input_file_id}"
+            assert batch.input_file_id == uploaded_file.id, (
+                f"Input file ID should match: expected {uploaded_file.id}, got {batch.input_file_id}"
+            )
 
             print(
                 f"Success: Created file-based batch with ID: {batch.id}, status: {batch.status} for provider {provider}"
@@ -3041,15 +3232,20 @@ class TestOpenAIIntegration:
                         },
                     )
                 except Exception as e:
-                    print(f"Info: Could not cancel batch (may already be processed): {e}")
+                    print(
+                        f"Info: Could not cancel batch (may already be processed): {e}"
+                    )
 
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("batch_list")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("batch_list"),
     )
     def test_47_batch_list(self, test_config, provider, model, vk_enabled):
         """Test Case 47: List batch jobs
@@ -3063,7 +3259,9 @@ class TestOpenAIIntegration:
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
         # Use OpenAI SDK for batch list (provider passed via extra_query)
-        response = client.batches.list(limit=10, extra_query={"provider": provider, "model": model})
+        response = client.batches.list(
+            limit=10, extra_query={"provider": provider, "model": model}
+        )
         assert_valid_batch_list_response(response, min_count=0)
         batch_count = len(response.data)
 
@@ -3118,7 +3316,9 @@ class TestOpenAIIntegration:
                 # Clean up
                 if batch_id:
                     try:
-                        client.batches.cancel(batch_id, extra_body={"provider": provider})
+                        client.batches.cancel(
+                            batch_id, extra_body={"provider": provider}
+                        )
                     except Exception:
                         pass
             return
@@ -3146,7 +3346,11 @@ class TestOpenAIIntegration:
             )
             print(f"Creating file for batch processing: {jsonl_content}")
             uploaded_file = client.files.create(
-                file=("batch_retrieve_test.jsonl", jsonl_content.encode(), "application/jsonl"),
+                file=(
+                    "batch_retrieve_test.jsonl",
+                    jsonl_content.encode(),
+                    "application/jsonl",
+                ),
                 purpose="batch",
                 extra_body={
                     "provider": provider,
@@ -3176,7 +3380,9 @@ class TestOpenAIIntegration:
             batch_id = batch.id
 
             # Retrieve using SDK (provider passed via extra_query)
-            retrieved_batch = client.batches.retrieve(batch_id, extra_query={"provider": provider})
+            retrieved_batch = client.batches.retrieve(
+                batch_id, extra_query={"provider": provider}
+            )
             assert_valid_batch_response(retrieved_batch)
             assert retrieved_batch.id == batch_id
             print(
@@ -3192,12 +3398,15 @@ class TestOpenAIIntegration:
                     pass
             if uploaded_file:
                 try:
-                    client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                    client.files.delete(
+                        uploaded_file.id, extra_query={"provider": provider}
+                    )
                 except Exception:
                     pass
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("batch_cancel")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("batch_cancel"),
     )
     def test_49_batch_cancel(self, test_config, provider, model, vk_enabled):
         """Test Case 49: Cancel a batch job
@@ -3231,7 +3440,9 @@ class TestOpenAIIntegration:
                 batch_id = batch.id
 
                 # Cancel using SDK (provider passed via extra_body for POST)
-                cancelled_batch = client.batches.cancel(batch_id, extra_body={"provider": provider})
+                cancelled_batch = client.batches.cancel(
+                    batch_id, extra_body={"provider": provider}
+                )
                 assert cancelled_batch is not None
                 assert cancelled_batch.id == batch_id
                 assert cancelled_batch.status in ["cancelling", "cancelled"]
@@ -3275,7 +3486,11 @@ class TestOpenAIIntegration:
                     },
                 }
             uploaded_file = client.files.create(
-                file=("batch_cancel_test.jsonl", jsonl_content.encode(), "application/jsonl"),
+                file=(
+                    "batch_cancel_test.jsonl",
+                    jsonl_content.encode(),
+                    "application/jsonl",
+                ),
                 purpose="batch",
                 extra_body=file_extra_body,
             )
@@ -3296,7 +3511,9 @@ class TestOpenAIIntegration:
             batch_id = batch.id
 
             # Cancel using SDK (provider passed via extra_body for POST)
-            cancelled_batch = client.batches.cancel(batch_id, extra_body={"provider": provider})
+            cancelled_batch = client.batches.cancel(
+                batch_id, extra_body={"provider": provider}
+            )
             assert cancelled_batch is not None
             assert cancelled_batch.id == batch_id
             assert cancelled_batch.status in ["cancelling", "cancelled"]
@@ -3308,7 +3525,9 @@ class TestOpenAIIntegration:
             # Clean up (provider passed via extra_query)
             if uploaded_file:
                 try:
-                    client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                    client.files.delete(
+                        uploaded_file.id, extra_query={"provider": provider}
+                    )
                 except Exception:
                     pass
 
@@ -3376,7 +3595,7 @@ class TestOpenAIIntegration:
                     retrieved_batch = client.batches.retrieve(
                         batch.id, extra_query={"provider": provider}
                     )
-                    print(f"  Poll {i+1}: status = {retrieved_batch.status}")
+                    print(f"  Poll {i + 1}: status = {retrieved_batch.status}")
 
                     if retrieved_batch.status in [
                         "completed",
@@ -3385,7 +3604,9 @@ class TestOpenAIIntegration:
                         "cancelled",
                         "ended",
                     ]:
-                        print(f"  Batch reached terminal state: {retrieved_batch.status}")
+                        print(
+                            f"  Batch reached terminal state: {retrieved_batch.status}"
+                        )
                         break
 
                     if (
@@ -3401,9 +3622,13 @@ class TestOpenAIIntegration:
 
                 # Step 4: Verify batch is in the list
                 print("Step 4: Verifying batch in list...")
-                batch_list = client.batches.list(limit=20, extra_query={"provider": provider})
+                batch_list = client.batches.list(
+                    limit=20, extra_query={"provider": provider}
+                )
                 batch_ids = [b.id for b in batch_list.data]
-                assert batch.id in batch_ids, f"Batch {batch.id} should be in the batch list"
+                assert batch.id in batch_ids, (
+                    f"Batch {batch.id} should be in the batch list"
+                )
                 print(f"  Verified batch {batch.id} is in list")
 
                 print(
@@ -3413,7 +3638,9 @@ class TestOpenAIIntegration:
             finally:
                 if batch:
                     try:
-                        client.batches.cancel(batch.id, extra_body={"provider": provider})
+                        client.batches.cancel(
+                            batch.id, extra_body={"provider": provider}
+                        )
                         print(f"Cleanup: Cancelled batch {batch.id}")
                     except Exception as e:
                         print(f"Cleanup info: Could not cancel batch: {e}")
@@ -3421,11 +3648,17 @@ class TestOpenAIIntegration:
 
         # File-based batching for other providers (OpenAI)
         # Step 1: Create and upload batch input file (provider passed via extra_body)
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=2, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=2, provider=provider
+        )
 
         print(f"Step 1: Uploading batch input file for provider {provider}...")
         uploaded_file = client.files.create(
-            file=("batch_e2e_file_test.jsonl", jsonl_content.encode(), "application/jsonl"),
+            file=(
+                "batch_e2e_file_test.jsonl",
+                jsonl_content.encode(),
+                "application/jsonl",
+            ),
             purpose="batch",
             extra_body={
                 "provider": provider,
@@ -3474,13 +3707,21 @@ class TestOpenAIIntegration:
                 retrieved_batch = client.batches.retrieve(
                     batch.id, extra_query={"provider": provider}
                 )
-                print(f"  Poll {i+1}: status = {retrieved_batch.status}")
+                print(f"  Poll {i + 1}: status = {retrieved_batch.status}")
 
-                if retrieved_batch.status in ["completed", "failed", "expired", "cancelled"]:
+                if retrieved_batch.status in [
+                    "completed",
+                    "failed",
+                    "expired",
+                    "cancelled",
+                ]:
                     print(f"  Batch reached terminal state: {retrieved_batch.status}")
                     break
 
-                if hasattr(retrieved_batch, "request_counts") and retrieved_batch.request_counts:
+                if (
+                    hasattr(retrieved_batch, "request_counts")
+                    and retrieved_batch.request_counts
+                ):
                     counts = retrieved_batch.request_counts
                     print(
                         f"    Request counts - total: {counts.total}, completed: {counts.completed}, failed: {counts.failed}"
@@ -3490,16 +3731,24 @@ class TestOpenAIIntegration:
 
             if provider != "bedrock":
                 # For bedrock, unless job status is completed or partially completed, counts are not available
-                assert total_requests == 2, f"Total requests should be 2, got {total_requests}"
+                assert total_requests == 2, (
+                    f"Total requests should be 2, got {total_requests}"
+                )
 
             # Step 4: Verify batch is in the list (provider passed via extra_query)
             print("Step 4: Verifying batch in list...")
-            batch_list = client.batches.list(limit=20, extra_query={"provider": provider})
+            batch_list = client.batches.list(
+                limit=20, extra_query={"provider": provider}
+            )
             batch_ids = [b.id for b in batch_list.data]
-            assert batch.id in batch_ids, f"Batch {batch.id} should be in the batch list"
+            assert batch.id in batch_ids, (
+                f"Batch {batch.id} should be in the batch list"
+            )
             print(f"  Verified batch {batch.id} is in list")
 
-            print(f"Success: File API E2E completed for batch {batch.id} (provider: {provider})")
+            print(
+                f"Success: File API E2E completed for batch {batch.id} (provider: {provider})"
+            )
 
         finally:
             if batch:
@@ -3510,7 +3759,9 @@ class TestOpenAIIntegration:
                     print(f"Cleanup info: Could not cancel batch: {e}")
 
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
                 print(f"Cleanup: Deleted file {uploaded_file.id}")
             except Exception as e:
                 print(f"Cleanup warning: Failed to delete file: {e}")
@@ -3520,7 +3771,8 @@ class TestOpenAIIntegration:
     # =========================================================================
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("count_tokens")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("count_tokens"),
     )
     def test_51a_input_tokens_simple_text(self, provider, model, vk_enabled):
         """Test Case 51a: Input tokens count with simple text"""
@@ -3537,12 +3789,13 @@ class TestOpenAIIntegration:
         assert_valid_input_tokens_response(response, "openai")
 
         # Simple text should have a reasonable token count (between 3-20 tokens)
-        assert (
-            3 <= response.input_tokens <= 20
-        ), f"Simple text should have 3-20 tokens, got {response.input_tokens}"
+        assert 3 <= response.input_tokens <= 20, (
+            f"Simple text should have 3-20 tokens, got {response.input_tokens}"
+        )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("count_tokens")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("count_tokens"),
     )
     def test_51b_input_tokens_with_system_message(self, provider, model, vk_enabled):
         """Test Case 51b: Input tokens count with system message"""
@@ -3559,12 +3812,13 @@ class TestOpenAIIntegration:
         assert_valid_input_tokens_response(response, "openai")
 
         # With system message should have more tokens than simple text
-        assert (
-            response.input_tokens > 2
-        ), f"With system message should have >2 tokens, got {response.input_tokens}"
+        assert response.input_tokens > 2, (
+            f"With system message should have >2 tokens, got {response.input_tokens}"
+        )
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("count_tokens")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("count_tokens"),
     )
     def test_51c_input_tokens_long_text(self, provider, model, vk_enabled):
         """Test Case 51c: Input tokens count with long text"""
@@ -3581,16 +3835,17 @@ class TestOpenAIIntegration:
         assert_valid_input_tokens_response(response, "openai")
 
         # Long text should have significantly more tokens
-        assert (
-            response.input_tokens > 100
-        ), f"Long text should have >100 tokens, got {response.input_tokens}"
+        assert response.input_tokens > 100, (
+            f"Long text should have >100 tokens, got {response.input_tokens}"
+        )
 
     # =========================================================================
     # WEB SEARCH TOOL TEST CASES
     # =========================================================================
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("web_search")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("web_search"),
     )
     def test_52_web_search_non_streaming(self, provider, model, vk_enabled):
         """Test Case 52: Web search tool (non-streaming) using Responses API"""
@@ -3618,7 +3873,6 @@ class TestOpenAIIntegration:
         # Check for web_search_call in output
         has_web_search_call = False
         has_message_output = False
-        has_citations = False
         search_status = None
         output_text = ""
 
@@ -3643,7 +3897,10 @@ class TestOpenAIIntegration:
                 has_message_output = True
                 if hasattr(output_item, "content") and output_item.content:
                     for content_block in output_item.content:
-                        if hasattr(content_block, "type") and content_block.type == "output_text":
+                        if (
+                            hasattr(content_block, "type")
+                            and content_block.type == "output_text"
+                        ):
                             if hasattr(content_block, "text"):
                                 output_text = content_block.text
                                 print(
@@ -3651,24 +3908,28 @@ class TestOpenAIIntegration:
                                 )
 
                             # Check for annotations (citations) from web search
-                            if hasattr(content_block, "annotations") and content_block.annotations:
-                                has_citations = True
+                            if (
+                                hasattr(content_block, "annotations")
+                                and content_block.annotations
+                            ):
                                 citation_count = len(content_block.annotations)
                                 print(f"✓ Found {citation_count} citations")
 
                                 # Validate citation structure using helper
-                                for i, annotation in enumerate(content_block.annotations[:3]):
+                                for i, annotation in enumerate(
+                                    content_block.annotations[:3]
+                                ):
                                     assert_valid_openai_annotation(
                                         annotation, expected_type="url_citation"
                                     )
                                     if hasattr(annotation, "url"):
-                                        print(f"  Citation {i+1}: {annotation.url}")
+                                        print(f"  Citation {i + 1}: {annotation.url}")
 
         # Validate web search was performed
         assert has_web_search_call, "Response should contain web_search_call"
-        assert (
-            search_status == "completed"
-        ), f"Web search should be completed, got status: {search_status}"
+        assert search_status == "completed", (
+            f"Web search should be completed, got status: {search_status}"
+        )
         assert has_message_output, "Response should contain message output"
         assert len(output_text) > 0, "Message should have text content"
 
@@ -3695,9 +3956,9 @@ class TestOpenAIIntegration:
             "humid",
             "dry",
         ]
-        assert any(
-            keyword in text_lower for keyword in weather_keywords
-        ), f"Response should mention weather-related information. Got: {output_text[:300]}..."
+        assert any(keyword in text_lower for keyword in weather_keywords), (
+            f"Response should mention weather-related information. Got: {output_text[:300]}..."
+        )
 
         # Validate usage information
         if hasattr(response, "usage"):
@@ -3705,10 +3966,11 @@ class TestOpenAIIntegration:
                 f"✓ Token usage - Input: {response.usage.input_tokens}, Output: {response.usage.output_tokens}"
             )
 
-        print(f"✓ Web search (non-streaming) test passed!")
+        print("✓ Web search (non-streaming) test passed!")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("web_search")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("web_search"),
     )
     def test_53_web_search_streaming(self, provider, model, vk_enabled):
         """Test Case 53: Web search tool (streaming) using Responses API"""
@@ -3796,7 +4058,9 @@ class TestOpenAIIntegration:
                         citations.append(annotation)
 
                         # Validate citation using helper
-                        assert_valid_openai_annotation(annotation, expected_type="url_citation")
+                        assert_valid_openai_annotation(
+                            annotation, expected_type="url_citation"
+                        )
 
                         if hasattr(annotation, "url") and hasattr(annotation, "title"):
                             print(f"  Citation received: {annotation.title}")
@@ -3837,11 +4101,11 @@ class TestOpenAIIntegration:
             "humid",
             "dry",
         ]
-        assert any(
-            keyword in text_lower for keyword in weather_keywords
-        ), f"Response should mention weather-related information. Got: {complete_text[:200]}..."
+        assert any(keyword in text_lower for keyword in weather_keywords), (
+            f"Response should mention weather-related information. Got: {complete_text[:200]}..."
+        )
 
-        print(f"✓ Streaming validation:")
+        print("✓ Streaming validation:")
         print(f"  - Chunks received: {chunk_count}")
         print(f"  - Search queries: {len(search_queries)}")
         print(f"  - Citations: {len(citations)}")
@@ -3853,17 +4117,20 @@ class TestOpenAIIntegration:
             for citation in citations:
                 assert_valid_openai_annotation(citation, expected_type="url_citation")
 
-        print(f"✓ Web search (streaming) test passed!")
+        print("✓ Web search (streaming) test passed!")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("web_search")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("web_search"),
     )
     def test_54_web_search_annotation_conversion(self, provider, model, vk_enabled):
         """Test Case 54: Validate Anthropic citations convert to OpenAI annotations correctly"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for web_search scenario")
 
-        print(f"\n=== Testing Web Search Annotation Conversion for provider {provider} ===")
+        print(
+            f"\n=== Testing Web Search Annotation Conversion for provider {provider} ==="
+        )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -3885,8 +4152,14 @@ class TestOpenAIIntegration:
             if hasattr(output_item, "type") and output_item.type == "message":
                 if hasattr(output_item, "content") and output_item.content:
                     for content_block in output_item.content:
-                        if hasattr(content_block, "type") and content_block.type == "output_text":
-                            if hasattr(content_block, "annotations") and content_block.annotations:
+                        if (
+                            hasattr(content_block, "type")
+                            and content_block.type == "output_text"
+                        ):
+                            if (
+                                hasattr(content_block, "annotations")
+                                and content_block.annotations
+                            ):
                                 for annotation in content_block.annotations:
                                     annotations_found.append(annotation)
 
@@ -3895,30 +4168,35 @@ class TestOpenAIIntegration:
             print(f"✓ Found {len(annotations_found)} annotations")
             for i, annotation in enumerate(annotations_found[:3]):
                 assert_valid_openai_annotation(annotation, expected_type="url_citation")
-                print(f"  Annotation {i+1}:")
+                print(f"  Annotation {i + 1}:")
                 print(f"    Type: {annotation.type}")
-                print(f"    URL: {annotation.url if hasattr(annotation, 'url') else 'N/A'}")
+                print(
+                    f"    URL: {annotation.url if hasattr(annotation, 'url') else 'N/A'}"
+                )
                 if hasattr(annotation, "title"):
                     print(f"    Title: {annotation.title}")
                 # Check for encrypted_index preservation
                 if hasattr(annotation, "encrypted_index"):
-                    print(f"    Encrypted index present: ✓")
+                    print("    Encrypted index present: ✓")
 
-            print(f"✓ All annotations have valid url_citation structure")
+            print("✓ All annotations have valid url_citation structure")
         else:
-            print(f"⚠ No annotations found")
+            print("⚠ No annotations found")
 
-        print(f"✓ Annotation conversion test passed!")
+        print("✓ Annotation conversion test passed!")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("web_search")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("web_search"),
     )
     def test_55_web_search_user_location(self, provider, model, vk_enabled):
         """Test Case 55: Web search with user location for localized results"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for web_search scenario")
 
-        print(f"\n=== Testing Web Search with User Location for provider {provider} ===")
+        print(
+            f"\n=== Testing Web Search with User Location for provider {provider} ==="
+        )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -3954,36 +4232,41 @@ class TestOpenAIIntegration:
             if hasattr(output_item, "type"):
                 if output_item.type == "web_search_call":
                     has_web_search = True
-                    print(f"✓ Web search executed")
+                    print("✓ Web search executed")
                 elif output_item.type == "message":
                     has_message = True
 
         assert has_web_search, "Should perform web search"
         assert has_message, "Should have message response"
 
-        print(f"✓ User location test passed!")
+        print("✓ User location test passed!")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("web_search")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("web_search"),
     )
     def test_56_web_search_wildcard_domains(self, provider, model, vk_enabled):
         """Test Case 56: Web search with wildcard domain patterns"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for web_search scenario")
 
-        print(f"\n=== Testing Web Search with Wildcard Domains for provider {provider} ===")
+        print(
+            f"\n=== Testing Web Search with Wildcard Domains for provider {provider} ==="
+        )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
         # Use wildcard domain patterns
         response = client.responses.create(
             model=format_provider_model(provider, model),
-            tools=[{
-                "type": "web_search",
-                "filters": {
-                    "allowed_domains": ["wikipedia.org", "en.wikipedia.org"]
+            tools=[
+                {
+                    "type": "web_search",
+                    "filters": {
+                        "allowed_domains": ["wikipedia.org", "en.wikipedia.org"]
+                    },
                 }
-            }],
+            ],
             input="What is machine learning use web search tool?",
             include=["web_search_call.action.sources"],
             max_output_tokens=1500,
@@ -3997,7 +4280,9 @@ class TestOpenAIIntegration:
         search_sources = []
         for output_item in response.output:
             if hasattr(output_item, "type") and output_item.type == "web_search_call":
-                if hasattr(output_item, "action") and hasattr(output_item.action, "sources"):
+                if hasattr(output_item, "action") and hasattr(
+                    output_item.action, "sources"
+                ):
                     if output_item.action.sources:
                         search_sources.extend(output_item.action.sources)
 
@@ -4005,19 +4290,22 @@ class TestOpenAIIntegration:
             print(f"✓ Found {len(search_sources)} search sources")
             for i, source in enumerate(search_sources[:3]):
                 if hasattr(source, "url"):
-                    print(f"  Source {i+1}: {source.url}")
+                    print(f"  Source {i + 1}: {source.url}")
 
-        print(f"✓ Wildcard domains test passed!")
+        print("✓ Wildcard domains test passed!")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("web_search")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("web_search"),
     )
     def test_57_web_search_multi_turn_openai(self, provider, model, vk_enabled):
         """Test Case 57: Web search in multi-turn conversation (OpenAI SDK)"""
         if provider == "_no_providers_" or model == "_no_model_":
             pytest.skip("No providers configured for web_search scenario")
 
-        print(f"\n=== Testing Web Search Multi-Turn (OpenAI SDK) for provider {provider} ===")
+        print(
+            f"\n=== Testing Web Search Multi-Turn (OpenAI SDK) for provider {provider} ==="
+        )
 
         client = get_provider_openai_client(provider, vk_enabled=vk_enabled)
 
@@ -4066,14 +4354,15 @@ class TestOpenAIIntegration:
 
         assert has_message, "Second turn should have message response"
         print(f"✓ Second turn completed with {len(response2.output)} output items")
-        print(f"✓ Multi-turn conversation test passed!")
+        print("✓ Multi-turn conversation test passed!")
 
     # =========================================================================
     # Async Inference Tests
     # =========================================================================
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("simple_chat")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("simple_chat"),
     )
     def test_58_async_chat_completions(self, test_config, provider, model, vk_enabled):
         """Test Case 58: Async chat completions - submit and poll"""
@@ -4131,7 +4420,8 @@ class TestOpenAIIntegration:
         pytest.fail(f"Async job did not complete after {max_polls} polls")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("responses")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("responses"),
     )
     def test_59_async_responses(self, test_config, provider, model, vk_enabled):
         """Test Case 59: Async responses API - submit and poll"""
@@ -4235,16 +4525,19 @@ class TestOpenAIIntegration:
         assert "response.completed" in event_types, (
             f"Expected response.completed. Got events: {event_types}"
         )
-        assert "response.failed" not in event_types and "response.incomplete" not in event_types, (
-            f"Unexpected non-success terminal event. Got events: {event_types}"
-        )
+        assert (
+            "response.failed" not in event_types
+            and "response.incomplete" not in event_types
+        ), f"Unexpected non-success terminal event. Got events: {event_types}"
         assert len(result["content"]) > 0, "Should receive non-empty text content"
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
         get_cross_provider_params_with_vk_for_scenario("responses"),
     )
-    def test_61_ws_responses_integration_paths(self, test_config, provider, model, vk_enabled):
+    def test_61_ws_responses_integration_paths(
+        self, test_config, provider, model, vk_enabled
+    ):
         """Test Case 61: WebSocket Responses API via OpenAI integration paths.
 
         Validates that WebSocket connections work through all integration-prefixed
@@ -4284,7 +4577,9 @@ class TestOpenAIIntegration:
                 extra_headers=extra_headers if extra_headers else None,
             )
 
-            assert result["error"] is None, f"WebSocket error at {path}: {result['error']}"
+            assert result["error"] is None, (
+                f"WebSocket error at {path}: {result['error']}"
+            )
             assert result["got_delta"], (
                 f"Expected delta events at {path}. "
                 f"Events: {[e.get('type') for e in result['events']]}"
@@ -4293,10 +4588,13 @@ class TestOpenAIIntegration:
             assert "response.completed" in event_types, (
                 f"Expected response.completed at {path}. Events: {event_types}"
             )
-            assert "response.failed" not in event_types and "response.incomplete" not in event_types, (
-                f"Unexpected non-success terminal event at {path}. Events: {event_types}"
+            assert (
+                "response.failed" not in event_types
+                and "response.incomplete" not in event_types
+            ), f"Unexpected non-success terminal event at {path}. Events: {event_types}"
+            assert len(result["content"]) > 0, (
+                f"Should receive non-empty content at {path}"
             )
-            assert len(result["content"]) > 0, f"Should receive non-empty content at {path}"
 
     @pytest.mark.parametrize(
         "provider,_model,vk_enabled",
@@ -4333,7 +4631,9 @@ class TestOpenAIIntegration:
             extra_headers=extra_headers if extra_headers else None,
         )
 
-        assert result["error"] is None, f"Realtime websocket returned error: {result['error']}"
+        assert result["error"] is None, (
+            f"Realtime websocket returned error: {result['error']}"
+        )
         assert result["got_session_created"], "Expected session.created event"
         assert result["got_session_updated"], "Expected session.updated event"
         assert result["got_text_delta"], (
@@ -4386,10 +4686,18 @@ class TestOpenAIIntegration:
                 extra_headers=extra_headers if extra_headers else None,
             )
 
-            assert result["error"] is None, f"Realtime websocket returned error at {ws_url}: {result['error']}"
-            assert result["got_session_created"], f"Expected session.created at {ws_url}"
-            assert result["got_session_updated"], f"Expected session.updated at {ws_url}"
-            assert result["got_text_delta"], f"Expected response.output_text.delta at {ws_url}"
+            assert result["error"] is None, (
+                f"Realtime websocket returned error at {ws_url}: {result['error']}"
+            )
+            assert result["got_session_created"], (
+                f"Expected session.created at {ws_url}"
+            )
+            assert result["got_session_updated"], (
+                f"Expected session.updated at {ws_url}"
+            )
+            assert result["got_text_delta"], (
+                f"Expected response.output_text.delta at {ws_url}"
+            )
             assert result["got_response_done"], f"Expected response.done at {ws_url}"
 
     @pytest.mark.parametrize(
@@ -4398,7 +4706,9 @@ class TestOpenAIIntegration:
             "simple_chat", include_providers=["openai"]
         ),
     )
-    def test_64_realtime_client_secret_routes(self, test_config, provider, _model, vk_enabled):
+    def test_64_realtime_client_secret_routes(
+        self, test_config, provider, _model, vk_enabled
+    ):
         """Test Case 64: Realtime client secret creation via raw HTTP routes."""
         if provider == "_no_providers_":
             pytest.skip("OpenAI provider is not configured for integration tests")
@@ -4453,14 +4763,26 @@ class TestOpenAIIntegration:
             assert result["status_code"] == 200, (
                 f"Expected 200 from {url}, got {result['status_code']}: {result['body']}"
             )
-            assert "session" in result["body"], f"Missing session object in response from {url}"
+            assert "session" in result["body"], (
+                f"Missing session object in response from {url}"
+            )
             if response_shape == "sessions":
-                assert "client_secret" in result["body"], f"Missing client_secret in response from {url}"
-                assert result["body"]["client_secret"].get("value"), f"Missing client_secret.value from {url}"
-                assert result["body"]["client_secret"].get("expires_at"), f"Missing client_secret.expires_at from {url}"
+                assert "client_secret" in result["body"], (
+                    f"Missing client_secret in response from {url}"
+                )
+                assert result["body"]["client_secret"].get("value"), (
+                    f"Missing client_secret.value from {url}"
+                )
+                assert result["body"]["client_secret"].get("expires_at"), (
+                    f"Missing client_secret.expires_at from {url}"
+                )
             else:
-                assert result["body"].get("value"), f"Missing top-level value from {url}"
-                assert result["body"].get("expires_at"), f"Missing top-level expires_at from {url}"
+                assert result["body"].get("value"), (
+                    f"Missing top-level value from {url}"
+                )
+                assert result["body"].get("expires_at"), (
+                    f"Missing top-level expires_at from {url}"
+                )
 
     @pytest.mark.parametrize(
         "provider,_model,vk_enabled",
@@ -4545,4 +4867,7 @@ class TestOpenAIIntegration:
         )
         body = result["body"]
         assert "error" in body, f"Expected error object in response, got {body}"
-        assert "not support" in body["error"]["message"].lower() or "provider" in body["error"]["message"].lower()
+        assert (
+            "not support" in body["error"]["message"].lower()
+            or "provider" in body["error"]["message"].lower()
+        )
