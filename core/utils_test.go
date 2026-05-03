@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCanProviderKeyValueBeEmpty(t *testing.T) {
@@ -47,6 +48,43 @@ func TestCanProviderKeyValueBeEmpty(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("CanProviderKeyValueBeEmpty(%v) = %v; want %v", tt.provider, result, tt.expected)
 			}
+		})
+	}
+}
+
+func TestIsSupportedBaseProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider schemas.ModelProvider
+		expected bool
+	}{
+		// Valid base providers
+		{"OpenAI", schemas.OpenAI, true},
+		{"Anthropic", schemas.Anthropic, true},
+		{"Bedrock", schemas.Bedrock, true},
+		{"Cohere", schemas.Cohere, true},
+		{"Gemini", schemas.Gemini, true},
+		{"HuggingFace", schemas.HuggingFace, true},
+		{"Replicate", schemas.Replicate, true},
+		{"NvidiaNIM", schemas.NvidiaNIM, true},
+
+		// Standard providers that are NOT base providers
+		{"Azure", schemas.Azure, false},
+		{"Mistral", schemas.Mistral, false},
+		{"Groq", schemas.Groq, false},
+		{"Perplexity", schemas.Perplexity, false},
+		{"Ollama", schemas.Ollama, false},
+		{"Vertex", schemas.Vertex, false},
+
+		// Invalid or empty provider string
+		{"InvalidProvider", "invalid-provider", false},
+		{"EmptyProvider", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsSupportedBaseProvider(tt.provider)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
