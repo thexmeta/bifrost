@@ -12,10 +12,10 @@ def pytest_configure(config):
     # Configure logging
     logging.basicConfig(
         level=logging.ERROR,
-        format='%(asctime)s [%(levelname)8s] %(name)s: %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s [%(levelname)8s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    
+
     # Add custom markers
     config.addinivalue_line("markers", "openai: mark test as requiring OpenAI API key")
     config.addinivalue_line(
@@ -25,7 +25,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "litellm: mark test as requiring LiteLLM setup")
     config.addinivalue_line("markers", "azure: Azure OpenAI integration tests")
     config.addinivalue_line(
-        "markers", "flaky: mark test as flaky with automatic retries (reruns=3, reruns_delay=2)"
+        "markers",
+        "flaky: mark test as flaky with automatic retries (reruns=3, reruns_delay=2)",
     )
 
 
@@ -33,11 +34,11 @@ def pytest_collection_modifyitems(config, items):
     """Modify test collection to add markers based on test file names"""
     # Add flaky marker to all tests for retry on failure
     flaky_marker = pytest.mark.flaky(reruns=3, reruns_delay=2)
-    
+
     for item in items:
         # Add flaky marker to all tests
         item.add_marker(flaky_marker)
-        
+
         # Add markers based on test file location
         if "test_openai" in item.nodeid:
             item.add_marker(pytest.mark.openai)

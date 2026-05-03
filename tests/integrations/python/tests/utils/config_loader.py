@@ -25,6 +25,7 @@ INTEGRATION_TO_PROVIDER_MAP = {
     "azure": "azure",
 }
 
+
 @dataclass
 class BifrostConfig:
     """Bifrost gateway configuration"""
@@ -140,13 +141,13 @@ class ConfigLoader:
 
     def get_model(self, integration: str, model_type: str = "chat") -> str:
         """Get model name for an integration and type
-        
+
         Maps integration names to provider configurations.
-        
+
         Args:
             integration: Integration name (openai, anthropic, google, litellm, langchain)
             model_type: Model type (chat, vision, tools, etc.)
-        
+
         Returns:
             Model name for the integration and type
         """
@@ -157,7 +158,7 @@ class ConfigLoader:
                 f"Unknown integration: {integration}. "
                 f"Valid integrations: {list(INTEGRATION_TO_PROVIDER_MAP.keys())}"
             )
-        
+
         # Get model from provider configuration
         return self.get_provider_model(provider, model_type)
 
@@ -167,14 +168,14 @@ class ConfigLoader:
         provider = INTEGRATION_TO_PROVIDER_MAP.get(integration)
         if not provider:
             return []
-        
+
         # Get alternatives from provider configuration
         if "providers" not in self._config:
             return []
-        
+
         if provider not in self._config["providers"]:
             return []
-        
+
         return self._config["providers"][provider].get("alternatives", [])
 
     def get_model_capabilities(self, model: str) -> Dict[str, Any]:
@@ -234,18 +235,21 @@ class ConfigLoader:
             provider = INTEGRATION_TO_PROVIDER_MAP.get(integration)
             if not provider:
                 raise ValueError(f"Unknown integration: {integration}")
-            
-            if "providers" not in self._config or provider not in self._config["providers"]:
+
+            if (
+                "providers" not in self._config
+                or provider not in self._config["providers"]
+            ):
                 raise ValueError(f"No provider configuration for: {provider}")
-            
+
             return {integration: self._config["providers"][provider]}
-        
+
         # Return all providers mapped to their integration names
         result = {}
         for integration, provider in INTEGRATION_TO_PROVIDER_MAP.items():
             if "providers" in self._config and provider in self._config["providers"]:
                 result[integration] = self._config["providers"][provider]
-        
+
         return result
 
     def validate_config(self) -> bool:
@@ -294,7 +298,7 @@ class ConfigLoader:
                 print(f"    Chat: {models.get('chat', 'N/A')}")
                 print(f"    Vision: {models.get('vision', 'N/A')}")
                 print(f"    Tools: {models.get('tools', 'N/A')}")
-                alternatives = models.get('alternatives', [])
+                alternatives = models.get("alternatives", [])
                 print(f"    Alternatives: {len(alternatives)} models")
 
         # API settings
@@ -308,140 +312,140 @@ class ConfigLoader:
 
     def get_provider_model(self, provider: str, capability: str = "chat") -> str:
         """Get model name for a provider and capability
-        
+
         Args:
             provider: Provider name (e.g., 'openai', 'anthropic', 'gemini')
             capability: Capability type (default: 'chat')
-        
+
         Returns:
             Model name suitable for the provider and capability
         """
         if "providers" not in self._config:
             # Fallback to old behavior if providers section doesn't exist
             return ""
-        
+
         providers = self._config["providers"]
         if provider not in providers:
             return ""
-        
+
         provider_models = providers[provider]
         return provider_models.get(capability, "")
 
     def get_provider_api_key_env(self, provider: str) -> str:
         """Get the environment variable name for a provider's API key
-        
+
         Args:
             provider: Provider name
-            
+
         Returns:
             Environment variable name
         """
         if "provider_api_keys" not in self._config:
             return ""
-        
+
         return self._config["provider_api_keys"].get(provider, "")
 
     def is_provider_available(self, provider: str) -> bool:
         """Check if a provider is available (has API key in environment)
-        
+
         Args:
             provider: Provider name
-            
+
         Returns:
             True if provider's API key is set in environment
         """
         env_var = self.get_provider_api_key_env(provider)
         if not env_var:
             return False
-        
+
         api_key = os.getenv(env_var)
         return api_key is not None and api_key.strip() != ""
 
     def get_available_providers(self) -> List[str]:
         """Get list of providers that are available (have API keys configured)
-        
+
         Returns:
             List of available provider names
         """
         if "providers" not in self._config:
             return []
-        
+
         available = []
         for provider in self._config["providers"].keys():
             if self.is_provider_available(provider):
                 available.append(provider)
-        
+
         return available
 
     def provider_supports_scenario(self, provider: str, scenario: str) -> bool:
         """Check if a provider supports a specific test scenario
-        
+
         Args:
             provider: Provider name
             scenario: Scenario name
-            
+
         Returns:
             True if provider supports the scenario
         """
         if "provider_scenarios" not in self._config:
             return False
-        
+
         if provider not in self._config["provider_scenarios"]:
             return False
-        
+
         scenarios = self._config["provider_scenarios"][provider]
         return scenarios.get(scenario, False)
 
     def get_providers_for_scenario(self, scenario: str) -> List[str]:
         """Get list of available providers that support a specific scenario
-        
+
         Args:
             scenario: Scenario name
-            
+
         Returns:
             List of provider names that support the scenario
         """
         available_providers = self.get_available_providers()
         providers = []
-        
+
         for provider in available_providers:
             if self.provider_supports_scenario(provider, scenario):
                 providers.append(provider)
-        
+
         return providers
 
     def get_scenario_capability(self, scenario: str) -> str:
         """Get the capability type for a scenario
-        
+
         Args:
             scenario: Scenario name
-            
+
         Returns:
             Capability type (e.g., 'chat', 'vision', 'tools')
         """
         if "scenario_capabilities" not in self._config:
             return "chat"  # Default
-        
+
         return self._config["scenario_capabilities"].get(scenario, "chat")
 
     def get_virtual_key(self) -> str:
         """Get the virtual key value for testing
-        
+
         Returns:
             Virtual key string or empty string if not configured
         """
         if "virtual_key" not in self._config:
             return ""
-        
+
         vk_config = self._config["virtual_key"]
         if not vk_config.get("enabled", False):
             return ""
-        
+
         return vk_config.get("value", "")
 
     def is_virtual_key_configured(self) -> bool:
         """Check if virtual key testing is enabled and configured
-        
+
         Returns:
             True if virtual key is available for testing
         """

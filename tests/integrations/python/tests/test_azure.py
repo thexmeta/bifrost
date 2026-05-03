@@ -82,7 +82,6 @@ from .utils.common import (
     EMBEDDINGS_MULTIPLE_TEXTS,
     EMBEDDINGS_SIMILAR_TEXTS,
     EMBEDDINGS_SINGLE_TEXT,
-    BASE64_IMAGE,
     IMAGE_BASE64_MESSAGES,
     IMAGE_URL_MESSAGES,
     IMAGE_GENERATION_SIMPLE_PROMPT,
@@ -140,7 +139,6 @@ from .utils.common import (
     mock_tool_response,
     skip_if_no_api_key,
     # WebSocket utilities
-    WS_RESPONSES_SIMPLE_INPUT,
     get_ws_base_url,
     run_ws_responses_test,
 )
@@ -280,9 +278,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "multi_turn_conversation"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("multi_turn_conversation"),
     )
     def test_02_multi_turn_conversation(self, provider, model, vk_enabled):
         """Test Case 2: Multi-turn conversation using AzureOpenAI SDK"""
@@ -298,7 +294,10 @@ class TestAzureIntegration:
         assert_valid_chat_response(response)
         content = get_content_string(response.choices[0].message.content)
         # Should mention population or numbers since we asked about Paris population
-        assert any(word in content for word in ["population", "million", "people", "inhabitants"])
+        assert any(
+            word in content
+            for word in ["population", "million", "people", "inhabitants"]
+        )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
@@ -323,9 +322,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "multiple_tool_calls"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("multiple_tool_calls"),
     )
     def test_04_multiple_tool_calls(self, provider, model, vk_enabled):
         """Test Case 4: Multiple tool calls in one response using AzureOpenAI SDK"""
@@ -350,9 +347,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "end2end_tool_calling"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("end2end_tool_calling"),
     )
     def test_05_end2end_tool_calling(self, provider, model, vk_enabled):
         """Test Case 5: Complete tool calling flow with responses using AzureOpenAI SDK"""
@@ -360,7 +355,9 @@ class TestAzureIntegration:
             pytest.skip("No providers configured for this scenario")
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         # Initial request
-        messages = [{"role": "user", "content": "What's the weather in Boston in fahrenheit?"}]
+        messages = [
+            {"role": "user", "content": "What's the weather in Boston in fahrenheit?"}
+        ]
 
         response = client.chat.completions.create(
             model=format_provider_model(provider, model),
@@ -376,7 +373,9 @@ class TestAzureIntegration:
 
         # Add tool response
         tool_calls = extract_openai_tool_calls(response)
-        tool_response = mock_tool_response(tool_calls[0]["name"], tool_calls[0]["arguments"])
+        tool_response = mock_tool_response(
+            tool_calls[0]["name"], tool_calls[0]["arguments"]
+        )
 
         messages.append(
             {
@@ -388,7 +387,9 @@ class TestAzureIntegration:
 
         # Get final response
         final_response = client.chat.completions.create(
-            model=format_provider_model(provider, model), messages=messages, max_tokens=150
+            model=format_provider_model(provider, model),
+            messages=messages,
+            max_tokens=150,
         )
 
         assert_valid_chat_response(final_response)
@@ -398,9 +399,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "automatic_function_calling"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("automatic_function_calling"),
     )
     def test_06_automatic_function_calling(self, provider, model, vk_enabled):
         """Test Case 6: Automatic function calling (tool_choice='auto') using AzureOpenAI SDK"""
@@ -439,9 +438,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "image_base64"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("image_base64"),
     )
     def test_08_image_base64(self, provider, model, vk_enabled):
         """Test Case 8: Image analysis from base64 using AzureOpenAI SDK"""
@@ -458,9 +455,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "multiple_images"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("multiple_images"),
     )
     def test_09_multiple_images(self, provider, model, vk_enabled):
         """Test Case 9: Multiple image analysis using AzureOpenAI SDK"""
@@ -476,9 +471,9 @@ class TestAzureIntegration:
         assert_valid_image_response(response)
         content = get_content_string(response.choices[0].message.content)
         # Should mention comparison or differences (flexible matching)
-        assert any(
-            word in content for word in COMPARISON_KEYWORDS
-        ), f"Response should contain comparison keywords. Got content: {content}"
+        assert any(word in content for word in COMPARISON_KEYWORDS), (
+            f"Response should contain comparison keywords. Got content: {content}"
+        )
 
     # =========================================================================
     # AZURE-ONLY TESTS (use @skip_if_no_api_key("azure") and azure_client fixture)
@@ -572,7 +567,9 @@ class TestAzureIntegration:
         # Test 3: Temperature and top_p parameters
         response3 = azure_client.chat.completions.create(
             model=get_model("azure", "chat"),
-            messages=[{"role": "user", "content": "Tell me a creative story in one sentence."}],
+            messages=[
+                {"role": "user", "content": "Tell me a creative story in one sentence."}
+            ],
             temperature=0.9,
             top_p=0.9,
             max_tokens=100,
@@ -645,8 +642,12 @@ class TestAzureIntegration:
                 )
 
                 # Validate tool streaming results
-                assert chunk_count_tools > 0, "Should receive at least one chunk with tools"
-                assert tool_calls_detected_tools, "Should detect tool calls in streaming response"
+                assert chunk_count_tools > 0, (
+                    "Should receive at least one chunk with tools"
+                )
+                assert tool_calls_detected_tools, (
+                    "Should detect tool calls in streaming response"
+                )
 
     # =========================================================================
     # AZURE-ONLY SPEECH AND TRANSCRIPTION TESTS
@@ -678,7 +679,9 @@ class TestAzureIntegration:
         assert_valid_speech_response(audio_content2, expected_audio_size_min=500)
 
         # Verify that different voices produce different audio
-        assert audio_content != audio_content2, "Different voices should produce different audio"
+        assert audio_content != audio_content2, (
+            "Different voices should produce different audio"
+        )
 
     @skip_if_no_api_key("azure")
     def test_15_transcription_audio(self, azure_client):
@@ -878,9 +881,9 @@ class TestAzureIntegration:
 
         # Verify that different voices produce different sized outputs (generally)
         sizes = [size for _, size in voices_tested]
-        assert len(set(sizes)) > 1 or all(
-            s > 1000 for s in sizes
-        ), "Different voices should produce varying audio outputs"
+        assert len(set(sizes)) > 1 or all(s > 1000 for s in sizes), (
+            "Different voices should produce varying audio outputs"
+        )
 
         # Test different response formats
         formats_to_test = ["mp3", "wav", "opus"]
@@ -920,7 +923,9 @@ class TestAzureIntegration:
             pytest.skip("No providers configured for this scenario")
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         response = client.embeddings.create(
-            model=format_provider_model(provider, model), input=EMBEDDINGS_SINGLE_TEXT, dimensions=1536
+            model=format_provider_model(provider, model),
+            input=EMBEDDINGS_SINGLE_TEXT,
+            dimensions=1536,
         )
 
         assert_valid_embedding_response(response, expected_dimensions=1536)
@@ -928,7 +933,9 @@ class TestAzureIntegration:
         # Verify response structure
         assert len(response.data) == 1, "Should have exactly one embedding"
         assert response.data[0].index == 0, "First embedding should have index 0"
-        assert response.data[0].object == "embedding", "Object type should be 'embedding'"
+        assert response.data[0].object == "embedding", (
+            "Object type should be 'embedding'"
+        )
 
         # Verify model in response
         assert response.model is not None, "Response should include model name"
@@ -943,18 +950,22 @@ class TestAzureIntegration:
             pytest.skip("No providers configured for this scenario")
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         response = client.embeddings.create(
-            model=format_provider_model(provider, model), input=EMBEDDINGS_MULTIPLE_TEXTS, dimensions=1536
+            model=format_provider_model(provider, model),
+            input=EMBEDDINGS_MULTIPLE_TEXTS,
+            dimensions=1536,
         )
 
         expected_count = len(EMBEDDINGS_MULTIPLE_TEXTS)
-        assert_valid_embeddings_batch_response(response, expected_count, expected_dimensions=1536)
+        assert_valid_embeddings_batch_response(
+            response, expected_count, expected_dimensions=1536
+        )
 
         # Verify each embedding has correct index
         for i, embedding_obj in enumerate(response.data):
             assert embedding_obj.index == i, f"Embedding {i} should have index {i}"
-            assert (
-                embedding_obj.object == "embedding"
-            ), f"Embedding {i} should have object type 'embedding'"
+            assert embedding_obj.object == "embedding", (
+                f"Embedding {i} should have object type 'embedding'"
+            )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
@@ -966,7 +977,9 @@ class TestAzureIntegration:
             pytest.skip("No providers configured for this scenario")
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         response = client.embeddings.create(
-            model=format_provider_model(provider, model), input=EMBEDDINGS_SIMILAR_TEXTS, dimensions=1536
+            model=format_provider_model(provider, model),
+            input=EMBEDDINGS_SIMILAR_TEXTS,
+            dimensions=1536,
         )
 
         assert_valid_embeddings_batch_response(
@@ -981,15 +994,15 @@ class TestAzureIntegration:
         similarity_2_3 = calculate_cosine_similarity(embeddings[1], embeddings[2])
 
         # Similar texts should have high similarity (> 0.6)
-        assert (
-            similarity_1_2 > 0.6
-        ), f"Similar texts should have high similarity, got {similarity_1_2:.4f}"
-        assert (
-            similarity_1_3 > 0.6
-        ), f"Similar texts should have high similarity, got {similarity_1_3:.4f}"
-        assert (
-            similarity_2_3 > 0.6
-        ), f"Similar texts should have high similarity, got {similarity_2_3:.4f}"
+        assert similarity_1_2 > 0.6, (
+            f"Similar texts should have high similarity, got {similarity_1_2:.4f}"
+        )
+        assert similarity_1_3 > 0.6, (
+            f"Similar texts should have high similarity, got {similarity_1_3:.4f}"
+        )
+        assert similarity_2_3 > 0.6, (
+            f"Similar texts should have high similarity, got {similarity_2_3:.4f}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
@@ -1001,7 +1014,9 @@ class TestAzureIntegration:
             pytest.skip("No providers configured for this scenario")
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         response = client.embeddings.create(
-            model=format_provider_model(provider, model), input=EMBEDDINGS_DIFFERENT_TEXTS, dimensions=1536
+            model=format_provider_model(provider, model),
+            input=EMBEDDINGS_DIFFERENT_TEXTS,
+            dimensions=1536,
         )
 
         assert_valid_embeddings_batch_response(
@@ -1012,24 +1027,28 @@ class TestAzureIntegration:
 
         # Test dissimilarity between different topic embeddings
         # Weather vs Programming
-        weather_prog_similarity = calculate_cosine_similarity(embeddings[0], embeddings[1])
+        weather_prog_similarity = calculate_cosine_similarity(
+            embeddings[0], embeddings[1]
+        )
         # Weather vs Stock Market
-        weather_stock_similarity = calculate_cosine_similarity(embeddings[0], embeddings[2])
+        weather_stock_similarity = calculate_cosine_similarity(
+            embeddings[0], embeddings[2]
+        )
         # Programming vs Machine Learning (should be more similar)
         prog_ml_similarity = calculate_cosine_similarity(embeddings[1], embeddings[3])
 
         # Different topics should have lower similarity
-        assert (
-            weather_prog_similarity < 0.8
-        ), f"Different topics should have lower similarity, got {weather_prog_similarity:.4f}"
-        assert (
-            weather_stock_similarity < 0.8
-        ), f"Different topics should have lower similarity, got {weather_stock_similarity:.4f}"
+        assert weather_prog_similarity < 0.8, (
+            f"Different topics should have lower similarity, got {weather_prog_similarity:.4f}"
+        )
+        assert weather_stock_similarity < 0.8, (
+            f"Different topics should have lower similarity, got {weather_stock_similarity:.4f}"
+        )
 
         # Programming and ML should be more similar than completely different topics
-        assert (
-            prog_ml_similarity > weather_prog_similarity
-        ), "Related tech topics should be more similar than unrelated topics"
+        assert prog_ml_similarity > weather_prog_similarity, (
+            "Related tech topics should be more similar than unrelated topics"
+        )
 
     @skip_if_no_api_key("azure")
     def test_25_embedding_different_models(self, azure_client):
@@ -1038,14 +1057,16 @@ class TestAzureIntegration:
 
         # Test with text-embedding-3-small (default)
         response_small = azure_client.embeddings.create(
-            model=format_provider_model("azure", "text-embedding-3-small"), input=test_text
+            model=format_provider_model("azure", "text-embedding-3-small"),
+            input=test_text,
         )
         assert_valid_embedding_response(response_small, expected_dimensions=1536)
 
         # Test with text-embedding-3-large if available
         try:
             response_large = azure_client.embeddings.create(
-                model=format_provider_model("azure", "text-embedding-3-large"), input=test_text
+                model=format_provider_model("azure", "text-embedding-3-large"),
+                input=test_text,
             )
             assert_valid_embedding_response(response_large, expected_dimensions=3072)
 
@@ -1054,9 +1075,9 @@ class TestAzureIntegration:
             embedding_large = response_large.data[0].embedding
 
             # They should have different dimensions
-            assert len(embedding_small) != len(
-                embedding_large
-            ), "Different models should produce different dimension embeddings"
+            assert len(embedding_small) != len(embedding_large), (
+                "Different models should produce different dimension embeddings"
+            )
 
         except Exception as e:
             # If text-embedding-3-large is not available, just log it
@@ -1072,14 +1093,18 @@ class TestAzureIntegration:
             pytest.skip("No providers configured for this scenario")
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         response = client.embeddings.create(
-            model=format_provider_model(provider, model), input=EMBEDDINGS_LONG_TEXT, dimensions=1536
+            model=format_provider_model(provider, model),
+            input=EMBEDDINGS_LONG_TEXT,
+            dimensions=1536,
         )
 
         assert_valid_embedding_response(response, expected_dimensions=1536)
 
         # Verify token usage is reported for longer text
         assert response.usage is not None, "Usage should be reported for longer text"
-        assert response.usage.total_tokens > 20, "Longer text should consume more tokens"
+        assert response.usage.total_tokens > 20, (
+            "Longer text should consume more tokens"
+        )
 
     @skip_if_no_api_key("azure")
     def test_27_embedding_error_handling(self, azure_client):
@@ -1105,9 +1130,9 @@ class TestAzureIntegration:
 
         except Exception as e:
             # Empty input might be rejected, which is acceptable
-            assert (
-                "empty" in str(e).lower() or "invalid" in str(e).lower()
-            ), "Error should mention empty or invalid input"
+            assert "empty" in str(e).lower() or "invalid" in str(e).lower(), (
+                "Error should mention empty or invalid input"
+            )
 
     @skip_if_no_api_key("azure")
     def test_28_embedding_dimensionality_reduction(self, azure_client):
@@ -1121,7 +1146,9 @@ class TestAzureIntegration:
                 dimensions=custom_dimensions,
             )
 
-            assert_valid_embedding_response(response, expected_dimensions=custom_dimensions)
+            assert_valid_embedding_response(
+                response, expected_dimensions=custom_dimensions
+            )
 
             # Compare with default dimensions
             response_default = azure_client.embeddings.create(
@@ -1131,13 +1158,13 @@ class TestAzureIntegration:
             embedding_custom = response.data[0].embedding
             embedding_default = response_default.data[0].embedding
 
-            assert (
-                len(embedding_custom) == custom_dimensions
-            ), f"Custom dimensions should be {custom_dimensions}"
+            assert len(embedding_custom) == custom_dimensions, (
+                f"Custom dimensions should be {custom_dimensions}"
+            )
             assert len(embedding_default) == 1536, "Default dimensions should be 1536"
-            assert len(embedding_custom) != len(
-                embedding_default
-            ), "Custom and default dimensions should be different"
+            assert len(embedding_custom) != len(embedding_default), (
+                "Custom and default dimensions should be different"
+            )
 
         except Exception as e:
             # Custom dimensions might not be supported by all models
@@ -1156,9 +1183,9 @@ class TestAzureIntegration:
 
             assert_valid_embedding_response(response_float, expected_dimensions=1536)
             embedding_float = response_float.data[0].embedding
-            assert all(
-                isinstance(x, float) for x in embedding_float
-            ), "Float encoding should return float values"
+            assert all(isinstance(x, float) for x in embedding_float), (
+                "Float encoding should return float values"
+            )
 
             # Test with base64 encoding if supported
             try:
@@ -1169,9 +1196,9 @@ class TestAzureIntegration:
                 )
 
                 # Base64 encoding returns string data
-                assert (
-                    response_base64.data[0].embedding is not None
-                ), "Base64 encoding should return data"
+                assert response_base64.data[0].embedding is not None, (
+                    "Base64 encoding should return data"
+                )
 
             except Exception as base64_error:
                 print(f"Base64 encoding not supported: {base64_error}")
@@ -1189,8 +1216,12 @@ class TestAzureIntegration:
         )
 
         assert_valid_embedding_response(response_single)
-        assert response_single.usage is not None, "Single embedding should have usage data"
-        assert response_single.usage.total_tokens > 0, "Single embedding should consume tokens"
+        assert response_single.usage is not None, (
+            "Single embedding should have usage data"
+        )
+        assert response_single.usage.total_tokens > 0, (
+            "Single embedding should consume tokens"
+        )
         single_tokens = response_single.usage.total_tokens
 
         # Batch embedding
@@ -1198,24 +1229,30 @@ class TestAzureIntegration:
             model=get_model("azure", "embeddings"), input=EMBEDDINGS_MULTIPLE_TEXTS
         )
 
-        assert_valid_embeddings_batch_response(response_batch, len(EMBEDDINGS_MULTIPLE_TEXTS))
-        assert response_batch.usage is not None, "Batch embedding should have usage data"
-        assert response_batch.usage.total_tokens > 0, "Batch embedding should consume tokens"
+        assert_valid_embeddings_batch_response(
+            response_batch, len(EMBEDDINGS_MULTIPLE_TEXTS)
+        )
+        assert response_batch.usage is not None, (
+            "Batch embedding should have usage data"
+        )
+        assert response_batch.usage.total_tokens > 0, (
+            "Batch embedding should consume tokens"
+        )
         batch_tokens = response_batch.usage.total_tokens
 
         # Batch should consume more tokens than single
-        assert (
-            batch_tokens > single_tokens
-        ), f"Batch embedding ({batch_tokens} tokens) should consume more than single ({single_tokens} tokens)"
+        assert batch_tokens > single_tokens, (
+            f"Batch embedding ({batch_tokens} tokens) should consume more than single ({single_tokens} tokens)"
+        )
 
         # Verify proportional token usage
         texts_ratio = len(EMBEDDINGS_MULTIPLE_TEXTS)
         token_ratio = batch_tokens / single_tokens
 
         # Token ratio should be roughly proportional to text count (allowing for some variance)
-        assert (
-            0.5 * texts_ratio <= token_ratio <= 2.0 * texts_ratio
-        ), f"Token usage ratio ({token_ratio:.2f}) should be roughly proportional to text count ({texts_ratio})"
+        assert 0.5 * texts_ratio <= token_ratio <= 2.0 * texts_ratio, (
+            f"Token usage ratio ({token_ratio:.2f}) should be roughly proportional to text count ({texts_ratio})"
+        )
 
     # =========================================================================
     # LIST MODELS TEST
@@ -1262,10 +1299,19 @@ class TestAzureIntegration:
                             content += block.text
 
         content_lower = content.lower()
-        keywords = ["space", "exploration", "astronaut", "moon", "mars", "rocket", "nasa", "satellite"]
-        assert any(
-            keyword in content_lower for keyword in keywords
-        ), f"Response should contain space exploration related content. Got: {content}"
+        keywords = [
+            "space",
+            "exploration",
+            "astronaut",
+            "moon",
+            "mars",
+            "rocket",
+            "nasa",
+            "satellite",
+        ]
+        assert any(keyword in content_lower for keyword in keywords), (
+            f"Response should contain space exploration related content. Got: {content}"
+        )
 
         # Verify usage information
         if hasattr(response, "usage"):
@@ -1303,15 +1349,13 @@ class TestAzureIntegration:
         # Should mention Mars since system message says we're an astronomy expert
         content_lower = content.lower()
         mars_keywords = ["mars", "water", "planet", "discovery", "rover"]
-        assert any(
-            keyword in content_lower for keyword in mars_keywords
-        ), f"Response should contain Mars-related content from astronomy expert. Got: {content}"
+        assert any(keyword in content_lower for keyword in mars_keywords), (
+            f"Response should contain Mars-related content from astronomy expert. Got: {content}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "responses_image"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("responses_image"),
     )
     def test_34_responses_with_image(self, provider, model, vk_enabled):
         """Test Case 34: Responses API with image input using AzureOpenAI SDK"""
@@ -1353,9 +1397,9 @@ class TestAzureIntegration:
             "landscape",
             "boardwalk",
         ]
-        assert any(
-            keyword in content_lower for keyword in image_keywords
-        ), f"Response should describe the image. Got: {content}"
+        assert any(keyword in content_lower for keyword in image_keywords), (
+            f"Response should describe the image. Got: {content}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
@@ -1395,9 +1439,9 @@ class TestAzureIntegration:
 
         # Validate function call structure
         assert hasattr(function_call_message, "name"), "Function call should have name"
-        assert (
-            function_call_message.name == "get_weather"
-        ), f"Function call should be 'get_weather', got {function_call_message.name}"
+        assert function_call_message.name == "get_weather", (
+            f"Function call should be 'get_weather', got {function_call_message.name}"
+        )
 
         # Check arguments if present
         if hasattr(function_call_message, "arguments"):
@@ -1409,9 +1453,9 @@ class TestAzureIntegration:
 
             assert "location" in args, "Function call should have location argument"
             location_lower = str(args["location"]).lower()
-            assert (
-                "boston" in location_lower
-            ), f"Location should mention Boston, got {args['location']}"
+            assert "boston" in location_lower, (
+                f"Location should mention Boston, got {args['location']}"
+            )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
@@ -1443,9 +1487,9 @@ class TestAzureIntegration:
         has_content_events = any(
             "delta" in evt or "text" in evt or "output" in evt for evt in event_types
         )
-        assert (
-            has_content_events
-        ), f"Should receive content-related events. Got events: {list(event_types.keys())}"
+        assert has_content_events, (
+            f"Should receive content-related events. Got events: {list(event_types.keys())}"
+        )
 
         # Check content quality - should be a poem about AI
         content_lower = content.lower()
@@ -1459,12 +1503,14 @@ class TestAzureIntegration:
             "data",
             "compute",
         ]
-        assert any(
-            keyword in content_lower for keyword in ai_keywords
-        ), f"Poem should mention AI-related terms. Got: {content}"
+        assert any(keyword in content_lower for keyword in ai_keywords), (
+            f"Poem should mention AI-related terms. Got: {content}"
+        )
 
         # Should have multiple chunks for streaming
-        assert chunk_count > 1, f"Streaming should have multiple chunks, got {chunk_count}"
+        assert chunk_count > 1, (
+            f"Streaming should have multiple chunks, got {chunk_count}"
+        )
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
@@ -1555,17 +1601,25 @@ class TestAzureIntegration:
                             if hasattr(block, "text") and block.text:
                                 content += block.text
                             # Check for reasoning content blocks
-                            if hasattr(block, "type") and block.type == "reasoning_text":
+                            if (
+                                hasattr(block, "type")
+                                and block.type == "reasoning_text"
+                            ):
                                 has_reasoning_content = True
 
                 # Check summary field within output messages (reasoning models)
                 if hasattr(message, "summary") and message.summary:
-                    has_reasoning_content = True  # Presence of summary indicates reasoning
+                    has_reasoning_content = (
+                        True  # Presence of summary indicates reasoning
+                    )
                     if isinstance(message.summary, list):
                         for summary_item in message.summary:
                             if hasattr(summary_item, "text") and summary_item.text:
                                 content += " " + summary_item.text
-                            elif isinstance(summary_item, dict) and "text" in summary_item:
+                            elif (
+                                isinstance(summary_item, dict)
+                                and "text" in summary_item
+                            ):
                                 content += " " + summary_item["text"]
                             # Check for summary_text type
                             if (
@@ -1597,7 +1651,9 @@ class TestAzureIntegration:
             ]
 
             # Should mention at least some reasoning keywords
-            keyword_matches = sum(1 for keyword in reasoning_keywords if keyword in content_lower)
+            keyword_matches = sum(
+                1 for keyword in reasoning_keywords if keyword in content_lower
+            )
             assert keyword_matches >= 3, (
                 f"Response should contain reasoning about trains problem. "
                 f"Found {keyword_matches} keywords out of {len(reasoning_keywords)}. "
@@ -1617,9 +1673,9 @@ class TestAzureIntegration:
             ]
 
             has_steps = any(indicator in content_lower for indicator in step_indicators)
-            assert (
-                has_steps
-            ), f"Response should show step-by-step reasoning. Content: {content[:200]}..."
+            assert has_steps, (
+                f"Response should show step-by-step reasoning. Content: {content[:200]}..."
+            )
 
             # Log if reasoning content was detected
             if has_reasoning_content:
@@ -1643,7 +1699,9 @@ class TestAzureIntegration:
             # Just verify basic response works
             error_str = str(e).lower()
             if "reasoning" in error_str or "not supported" in error_str:
-                print(f"Info: Model {model_to_use} may not fully support reasoning parameters")
+                print(
+                    f"Info: Model {model_to_use} may not fully support reasoning parameters"
+                )
 
                 # Fallback: Try without reasoning parameters
                 response = client.responses.create(
@@ -1664,7 +1722,8 @@ class TestAzureIntegration:
     # =========================================================================
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("batch_file_upload")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("batch_file_upload"),
     )
     def test_41_file_upload(self, test_config, provider, model, vk_enabled):
         """Test Case 41: Upload a file for batch processing via Azure"""
@@ -1680,7 +1739,9 @@ class TestAzureIntegration:
         if not s3_bucket:
             pytest.skip("S3 bucket not configured for file tests")
 
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=2, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=2, provider=provider
+        )
 
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         response = client.files.create(
@@ -1718,7 +1779,9 @@ class TestAzureIntegration:
             assert_valid_file_list_response(list_response, min_count=1)
 
             file_ids = [f.id for f in list_response.data]
-            assert response.id in file_ids, f"Uploaded file {response.id} should be in file list"
+            assert response.id in file_ids, (
+                f"Uploaded file {response.id} should be in file list"
+            )
 
             print(f"Success: Verified file {response.id} exists in file list")
 
@@ -1729,7 +1792,8 @@ class TestAzureIntegration:
                 print(f"Warning: Failed to clean up file: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_list")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_list"),
     )
     def test_42_file_list(self, test_config, provider, model, vk_enabled):
         """Test Case 42: List uploaded files via Azure"""
@@ -1745,7 +1809,9 @@ class TestAzureIntegration:
         if not s3_bucket:
             pytest.skip("S3 bucket not configured for file tests")
 
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=1, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=1, provider=provider
+        )
 
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         uploaded_file = client.files.create(
@@ -1780,20 +1846,23 @@ class TestAzureIntegration:
             assert_valid_file_list_response(response, min_count=1)
 
             file_ids = [f.id for f in response.data]
-            assert (
-                uploaded_file.id in file_ids
-            ), f"Uploaded file {uploaded_file.id} should be in file list"
+            assert uploaded_file.id in file_ids, (
+                f"Uploaded file {uploaded_file.id} should be in file list"
+            )
 
             print(f"Success: Listed {len(response.data)} files")
 
         finally:
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_retrieve")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_retrieve"),
     )
     def test_43_file_retrieve(self, test_config, provider, model, vk_enabled):
         """Test Case 43: Retrieve file metadata by ID via Azure"""
@@ -1809,7 +1878,9 @@ class TestAzureIntegration:
         if not s3_bucket:
             pytest.skip("S3 bucket not configured for file tests")
 
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=1, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=1, provider=provider
+        )
 
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         uploaded_file = client.files.create(
@@ -1828,26 +1899,31 @@ class TestAzureIntegration:
         )
 
         try:
-            response = client.files.retrieve(uploaded_file.id, extra_query={"provider": provider})
+            response = client.files.retrieve(
+                uploaded_file.id, extra_query={"provider": provider}
+            )
 
             assert_valid_file_response(response, expected_purpose="batch")
-            assert (
-                response.id == uploaded_file.id
-            ), f"Retrieved file ID should match: expected {uploaded_file.id}, got {response.id}"
-            assert (
-                response.filename == "test_retrieve.jsonl"
-            ), f"Filename should match: expected 'test_retrieve.jsonl', got {response.filename}"
+            assert response.id == uploaded_file.id, (
+                f"Retrieved file ID should match: expected {uploaded_file.id}, got {response.id}"
+            )
+            assert response.filename == "test_retrieve.jsonl", (
+                f"Filename should match: expected 'test_retrieve.jsonl', got {response.filename}"
+            )
 
             print(f"Success: Retrieved file metadata for {response.id}")
 
         finally:
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_delete")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_delete"),
     )
     def test_44_file_delete(self, test_config, provider, model, vk_enabled):
         """Test Case 44: Delete an uploaded file via Azure"""
@@ -1863,7 +1939,9 @@ class TestAzureIntegration:
         if not s3_bucket:
             pytest.skip("S3 bucket not configured for file tests")
 
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=1, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=1, provider=provider
+        )
 
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
         uploaded_file = client.files.create(
@@ -1881,7 +1959,9 @@ class TestAzureIntegration:
             },
         )
 
-        response = client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+        response = client.files.delete(
+            uploaded_file.id, extra_query={"provider": provider}
+        )
 
         assert_valid_file_delete_response(response, expected_id=uploaded_file.id)
 
@@ -1891,7 +1971,8 @@ class TestAzureIntegration:
             client.files.retrieve(uploaded_file.id, extra_query={"provider": provider})
 
     @pytest.mark.parametrize(
-        "provider,model,vk_enabled", get_cross_provider_params_with_vk_for_scenario("file_content")
+        "provider,model,vk_enabled",
+        get_cross_provider_params_with_vk_for_scenario("file_content"),
     )
     def test_45_file_content(self, test_config, provider, model, vk_enabled):
         """Test Case 45: Download file content via Azure"""
@@ -1908,7 +1989,9 @@ class TestAzureIntegration:
             pytest.skip("S3 bucket not configured for file tests")
 
         client = get_provider_azure_client(provider, vk_enabled=vk_enabled)
-        jsonl_content = create_batch_jsonl_content(model=model, num_requests=2, provider=provider)
+        jsonl_content = create_batch_jsonl_content(
+            model=model, num_requests=2, provider=provider
+        )
 
         uploaded_file = client.files.create(
             file=("test_content.jsonl", jsonl_content.encode(), "application/jsonl"),
@@ -1928,7 +2011,9 @@ class TestAzureIntegration:
         print(f"Success: Uploaded file with ID: {uploaded_file.id}")
 
         try:
-            response = client.files.content(uploaded_file.id, extra_query={"provider": provider})
+            response = client.files.content(
+                uploaded_file.id, extra_query={"provider": provider}
+            )
 
             assert response is not None, "File content should not be None"
 
@@ -1949,7 +2034,9 @@ class TestAzureIntegration:
 
         finally:
             try:
-                client.files.delete(uploaded_file.id, extra_query={"provider": provider})
+                client.files.delete(
+                    uploaded_file.id, extra_query={"provider": provider}
+                )
             except Exception as e:
                 print(f"Warning: Failed to clean up file: {e}")
 
@@ -1974,7 +2061,11 @@ class TestAzureIntegration:
         jsonl_content = create_batch_jsonl_content(model=model, num_requests=2)
 
         uploaded_file = azure_client.files.create(
-            file=("batch_create_file_test.jsonl", jsonl_content.encode(), "application/jsonl"),
+            file=(
+                "batch_create_file_test.jsonl",
+                jsonl_content.encode(),
+                "application/jsonl",
+            ),
             purpose="batch",
             extra_body={
                 "storage_config": {
@@ -2000,20 +2091,20 @@ class TestAzureIntegration:
             )
 
             assert_valid_batch_response(batch)
-            assert (
-                batch.input_file_id == uploaded_file.id
-            ), f"Input file ID should match: expected {uploaded_file.id}, got {batch.input_file_id}"
-
-            print(
-                f"Success: Created batch with ID: {batch.id}, status: {batch.status}"
+            assert batch.input_file_id == uploaded_file.id, (
+                f"Input file ID should match: expected {uploaded_file.id}, got {batch.input_file_id}"
             )
+
+            print(f"Success: Created batch with ID: {batch.id}, status: {batch.status}")
 
         finally:
             if batch:
                 try:
                     azure_client.batches.cancel(batch.id)
                 except Exception as e:
-                    print(f"Info: Could not cancel batch (may already be processed): {e}")
+                    print(
+                        f"Info: Could not cancel batch (may already be processed): {e}"
+                    )
 
             try:
                 azure_client.files.delete(uploaded_file.id)
@@ -2049,7 +2140,11 @@ class TestAzureIntegration:
 
         try:
             uploaded_file = azure_client.files.create(
-                file=("batch_retrieve_test.jsonl", jsonl_content.encode(), "application/jsonl"),
+                file=(
+                    "batch_retrieve_test.jsonl",
+                    jsonl_content.encode(),
+                    "application/jsonl",
+                ),
                 purpose="batch",
                 extra_body={
                     "storage_config": {
@@ -2114,7 +2209,11 @@ class TestAzureIntegration:
 
         try:
             uploaded_file = azure_client.files.create(
-                file=("batch_cancel_test.jsonl", jsonl_content.encode(), "application/jsonl"),
+                file=(
+                    "batch_cancel_test.jsonl",
+                    jsonl_content.encode(),
+                    "application/jsonl",
+                ),
                 purpose="batch",
                 extra_body={
                     "storage_config": {
@@ -2214,7 +2313,7 @@ class TestAzureIntegration:
 
             for i in range(max_polls):
                 retrieved_batch = azure_client.batches.retrieve(batch.id)
-                print(f"  Poll {i+1}: status = {retrieved_batch.status}")
+                print(f"  Poll {i + 1}: status = {retrieved_batch.status}")
 
                 if retrieved_batch.status in [
                     "completed",
@@ -2240,7 +2339,9 @@ class TestAzureIntegration:
             print("Step 4: Verifying batch in list...")
             batch_list = azure_client.batches.list(limit=20)
             batch_ids = [b.id for b in batch_list.data]
-            assert batch.id in batch_ids, f"Batch {batch.id} should be in the batch list"
+            assert batch.id in batch_ids, (
+                f"Batch {batch.id} should be in the batch list"
+            )
             print(f"  Verified batch {batch.id} is in list")
 
             print(f"Success: Batch E2E completed for batch {batch.id}")
@@ -2265,9 +2366,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "count_tokens"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("count_tokens"),
     )
     def test_51a_input_tokens_simple_text(self, provider, model, vk_enabled):
         """Test Case 51a: Input tokens count with simple text using AzureOpenAI SDK"""
@@ -2290,9 +2389,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "count_tokens"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("count_tokens"),
     )
     def test_51b_input_tokens_with_system_message(self, provider, model, vk_enabled):
         """Test Case 51b: Input tokens count with system message using AzureOpenAI SDK"""
@@ -2315,9 +2412,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "count_tokens"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("count_tokens"),
     )
     def test_51c_input_tokens_long_text(self, provider, model, vk_enabled):
         """Test Case 51c: Input tokens count with long text using AzureOpenAI SDK"""
@@ -2344,9 +2439,7 @@ class TestAzureIntegration:
 
     @pytest.mark.parametrize(
         "provider,model,vk_enabled",
-        get_cross_provider_params_with_vk_for_scenario(
-            "image_generation"
-        ),
+        get_cross_provider_params_with_vk_for_scenario("image_generation"),
     )
     def test_52a_image_generation_simple(self, provider, model, vk_enabled):
         """Test Case 52a: Simple image generation with basic prompt using AzureOpenAI SDK"""
@@ -2401,8 +2494,8 @@ class TestAzureIntegration:
 
         # Test each integration path matching Azure SDK URL patterns
         integration_paths = [
-            "/openai/v1/responses",   # Azure GA: wss://{endpoint}/openai/v1/responses
-            "/openai/responses",      # Azure Preview: wss://{endpoint}/openai/responses
+            "/openai/v1/responses",  # Azure GA: wss://{endpoint}/openai/v1/responses
+            "/openai/responses",  # Azure Preview: wss://{endpoint}/openai/responses
         ]
 
         for path in integration_paths:
