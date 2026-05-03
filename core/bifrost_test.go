@@ -2574,3 +2574,28 @@ func TestRemoveProvider_ConcurrentNewProducersDuringShutdown(t *testing.T) {
 		atomic.LoadInt64(&panicCount),
 		numProducers)
 }
+
+// TestBifrost_ReloadConfig tests the ReloadConfig method on Bifrost.
+func TestBifrost_ReloadConfig(t *testing.T) {
+	bifrost := &Bifrost{}
+
+	// Test setting DropExcessRequests to true
+	configTrue := schemas.BifrostConfig{
+		DropExcessRequests: true,
+	}
+	bifrost.ReloadConfig(configTrue)
+
+	if !bifrost.GetDropExcessRequests() {
+		t.Errorf("Expected DropExcessRequests to be true, got false")
+	}
+
+	// Test setting DropExcessRequests to false
+	configFalse := schemas.BifrostConfig{
+		DropExcessRequests: false,
+	}
+	bifrost.ReloadConfig(configFalse)
+
+	if bifrost.GetDropExcessRequests() {
+		t.Errorf("Expected DropExcessRequests to be false, got true")
+	}
+}
