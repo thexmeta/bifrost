@@ -616,7 +616,7 @@ func (br *BifrostRequest) SetModel(model string) {
 		br.VideoGenerationRequest.Model = model
 	case br.BatchCreateRequest != nil:
 		if br.BatchCreateRequest.Model != nil {
-			br.BatchCreateRequest.Model = new(model)
+			br.BatchCreateRequest.Model = &model
 		}
 	}
 }
